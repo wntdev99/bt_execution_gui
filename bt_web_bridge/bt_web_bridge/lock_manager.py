@@ -46,6 +46,12 @@ class ActiveRun:
     cancel_event: asyncio.Event = field(default_factory=asyncio.Event)
     current_step_idx: int | None = None   # scenario only
     feedback_messages: list[str] = field(default_factory=list)
+    # Scenario pause/step-by-step (unused for single-execution runs).
+    mode: str = 'auto'   # 'auto' | 'step_by_step'
+    pause_requested: bool = False   # 다음 step boundary 에서 paused 로 전환
+    is_paused: bool = False
+    resume_event: asyncio.Event = field(default_factory=asyncio.Event)
+    history_id: int | None = None    # sqlite execution_history.id
 
     def to_status_dict(self) -> dict:
         """Compact snapshot for /api/status + ws welcome."""

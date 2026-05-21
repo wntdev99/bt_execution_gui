@@ -3,12 +3,11 @@
 FastAPI ↔ ROS2 bridge — Layer 3 (startup self-check) + Layer 4 (payload validator)
 + scenario engine + HTTP REST + WebSocket. ament_python 패키지.
 
-> 본 패키지는 C1, C2, C3 세 sub-phase 로 분할 구현.
+> 본 패키지는 C1, C2, C3 세 sub-phase 로 분할 구현 — **세 단계 모두 완료**.
 >
-> **C1 완료**: manifest_loader / ros_bridge / self_check / `/api/status` / `/api/trees`.
-> **C2 완료**: lock_manager / payload_validator / emergency / ws_manager / execution_runner / `/api/execute` / `/api/execute/cancel` / `/api/emergency-stop` / `/api/trees/{id}/validate` / WebSocket `/api/ws`.
->
-> C3 (시나리오 엔진 + history + scenario endpoints) 후속.
+> - **C1** — manifest_loader / ros_bridge / self_check / `/api/status` / `/api/trees`
+> - **C2** — lock_manager / payload_validator / emergency / ws_manager / execution_runner / `/api/execute` 계열 / WebSocket `/api/ws`
+> - **C3** — scenario_storage / history_db / scenario_engine / `/api/scenarios/*` + `/api/scenarios/run/*` / `/api/history`
 
 ---
 
@@ -117,13 +116,28 @@ bt_web_bridge --manifest-dir ... --skip-self-check  # ★ 운영 시 금지
 | POST | `/api/execute/cancel` | 현재 실행 cancel 요청 |
 | POST | `/api/emergency-stop` | 전역 E-STOP — active goal cancel + WS broadcast |
 
+### Scenarios + history (C3)
+
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/api/scenarios` | 시나리오 목록 (modified_at desc) |
+| GET | `/api/scenarios/{id}` | 시나리오 상세 (steps 포함) |
+| POST | `/api/scenarios` | 시나리오 생성 (slug id 자동 + collision suffix) |
+| PUT | `/api/scenarios/{id}` | 수정 — `If-Match` 헤더로 optimistic lock |
+| DELETE | `/api/scenarios/{id}` | 삭제 |
+| POST | `/api/scenarios/{id}/run` | 실행 (mode=auto / step_by_step) |
+| POST | `/api/scenarios/run/pause` | 다음 step boundary 에서 pause |
+| POST | `/api/scenarios/run/resume` | resume |
+| POST | `/api/scenarios/run/next` | step_by_step 의 "다음" |
+| POST | `/api/scenarios/run/cancel` | 시나리오 cancel |
+| GET | `/api/history?limit=&offset=&kind=&scenario_id=` | 실행 이력 (페이지네이션) |
+| GET | `/api/history/{id}` | 실행 상세 + steps + snapshot |
+
 ### WebSocket (one-way, server → client)
 
 | Path | Event types |
 |---|---|
-| `/api/ws` | `welcome` / `execution_started` / `execution_feedback` / `execution_finished` / `emergency_stopped` / `error` |
-
-C3 endpoints (시나리오 CRUD + 실행 모니터) 는 후속 commit.
+| `/api/ws` | `welcome` / `execution_started` / `execution_feedback` / `execution_finished` / `scenario_step_started` / `scenario_step_feedback` / `scenario_step_finished` / `scenario_paused` / `scenario_resumed` / `scenario_completed` / `emergency_stopped` / `error` |
 
 ---
 
@@ -194,7 +208,8 @@ colcon test-result --verbose
 
 ## 9. 다음 단계
 
-- **C3**: scenario_engine + storage + history_db + `/api/scenarios/*` + 모든 시나리오 WS 이벤트
+- **Phase D**: Next.js 14 frontend (단일 모드 카드 / 시나리오 빌더 / 실시간 모니터 / E-STOP)
+- **v2** (Open Question 박제): 위험 액션 confirm / 로봇 사전 점검 / lint 정착 (ruff) / autocomplete BB
 
 ---
 

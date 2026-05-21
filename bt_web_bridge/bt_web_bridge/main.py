@@ -35,14 +35,20 @@ from pathlib import Path
 
 from bt_web_bridge.api.execute import router as execute_router
 from bt_web_bridge.api.execute import trees_validate_router
+from bt_web_bridge.api.history import router as history_router
+from bt_web_bridge.api.scenarios import router as scenarios_router
+from bt_web_bridge.api.scenarios import run_router as scenarios_run_router
 from bt_web_bridge.api.status import router as status_router
 from bt_web_bridge.api.trees import router as trees_router
 from bt_web_bridge.api.ws import router as ws_router
+from bt_web_bridge.history_db import HistoryDb
 from bt_web_bridge.lock_manager import LockManager
 from bt_web_bridge.manifest_loader import ManifestLoader, ManifestLoadError
 from bt_web_bridge.models import SelfCheckError
 from bt_web_bridge.payload_validator import PayloadValidator
 from bt_web_bridge.ros_bridge import RosBridge
+from bt_web_bridge.scenario_engine import ScenarioEngine
+from bt_web_bridge.scenario_storage import ScenarioStorage
 from bt_web_bridge.self_check import run_self_check
 from bt_web_bridge.ws_manager import WsManager
 from fastapi import FastAPI
@@ -60,6 +66,9 @@ def build_app(
     lock_manager: LockManager,
     ws_manager: WsManager,
     validator: PayloadValidator,
+    scenarios: ScenarioStorage,
+    history_db: HistoryDb,
+    scenario_engine: ScenarioEngine,
 ) -> FastAPI:
     """Build the FastAPI app with CORS + routers + shared state."""
     app = FastAPI(
@@ -84,14 +93,20 @@ def build_app(
     app.state.lock_manager = lock_manager
     app.state.ws_manager = ws_manager
     app.state.validator = validator
+    app.state.scenarios = scenarios
+    app.state.history_db = history_db
+    app.state.scenario_engine = scenario_engine
     app.state.background_tasks = set()
     app.state.self_check_passed_at = None
-    app.state.scenario_count = 0
+    app.state.scenario_count = scenarios.count()
 
     app.include_router(status_router)
     app.include_router(trees_router)
     app.include_router(execute_router)
     app.include_router(trees_validate_router)
+    app.include_router(scenarios_router)
+    app.include_router(scenarios_run_router)
+    app.include_router(history_router)
     app.include_router(ws_router)
 
     @app.get('/')
@@ -170,7 +185,22 @@ async def _amain(args: argparse.Namespace) -> int:
         ws_manager.bind_loop(asyncio.get_running_loop())
         validator = PayloadValidator(manifests)
 
-        app = build_app(bridge, manifests, lock_manager, ws_manager, validator)
+        # Scenario storage + history db (C3).
+        scenarios_dir = Path(args.scenarios_dir).expanduser().resolve()
+        scenarios = ScenarioStorage(scenarios_dir)
+        scenarios.reload()
+        history_db = HistoryDb(Path(args.history_db).expanduser().resolve())
+        await history_db.init()
+        if args.history_keep > 0:
+            await history_db.prune_oldest(args.history_keep)
+        scenario_engine = ScenarioEngine(
+            bridge, lock_manager, ws_manager, history_db, validator,
+        )
+
+        app = build_app(
+            bridge, manifests, lock_manager, ws_manager, validator,
+            scenarios, history_db, scenario_engine,
+        )
         app.state.self_check_passed_at = ts
 
         # ── uvicorn ──
@@ -223,6 +253,26 @@ def _build_argparser() -> argparse.ArgumentParser:
     p.add_argument(
         '--skip-self-check', action='store_true',
         help='Bypass Layer 3 startup self-check (dev only).',
+    )
+    p.add_argument(
+        '--scenarios-dir',
+        default=os.environ.get(
+            'BT_WEB_BRIDGE_SCENARIOS_DIR',
+            str(Path.home() / '.bt_execution_gui' / 'scenarios'),
+        ),
+        help='Directory for scenario yaml files.',
+    )
+    p.add_argument(
+        '--history-db',
+        default=os.environ.get(
+            'BT_WEB_BRIDGE_HISTORY_DB',
+            str(Path.home() / '.bt_execution_gui' / 'history.db'),
+        ),
+        help='SQLite path for execution history.',
+    )
+    p.add_argument(
+        '--history-keep', type=int, default=5000,
+        help='Prune history to keep at most N latest rows (0=disable).',
     )
     return p
 
