@@ -167,14 +167,23 @@ WantedBy=multi-user.target
 **상태:** 미결정.
 **제안:** v1 = stdout + journalctl. v2 = Loki/Grafana 옵션.
 
-### C-6. 테스트 전략
+### C-6. 테스트 전략 + ament_python strict lint
 
-**상태:** 미결정.
-**제안:**
-- bt_web_bridge: pytest + mock ROS bridge.
-- payload_validator: 단위 테스트 (manifest fixture).
-- self_check: integration test (mock bt_schema_server srv).
-- Frontend: vitest (단위) + playwright (e2e).
+**상태:** v0.1 C1 진행 중 부분 결정.
+
+**결정 (2026-05-21):**
+- `bt_schema_server` (C++): copyright / cpplint(120) / cppcheck / uncrustify / lint_cmake / xmllint / flake8 / pep257 항목별 명시 호출 — 통과.
+- `bt_web_bridge` (Python): ament_python 의 `flake8` (I100/I101 import-order strict + Q000 single-quote 강제) + `pep257` (D204 등 docstring 규칙) + `copyright` (license 인식 까다로움) 가 setup.cfg 우회 불가. **v0.1 에서는 unit test 만 유지 (manifest_loader 8 cases + self_check_types 8 cases = 16), lint test 제외**.
+
+**후속 작업 (v0.2):**
+- 옵션 a: ROS2 표준에 코드 맞추기 (alphabetical import-order + single-quote 전체 변환 + docstring D204 정착 + license header 재작성)
+- 옵션 b: 별도 `ruff`/`black` config 로 본 repo 만의 표준 정착 + ament_flake8 / ament_pep257 disable (setup.py 의 lint test 자체 제거)
+
+**현재 상태:** `package.xml` 의 lint test_depend 들 (`ament_copyright`, `ament_flake8`, `ament_pep257`) 도 제거. 본 결정 사항을 package.xml 안 주석에 박제.
+
+**제안 (v0.2 옵션 b 권장):** ruff 가 ament_flake8 보다 빠르고 설정 유연. `ruff check` + `ruff format` + `pyright` 조합. ament_python 의 strict lint 는 ROS2 표준 권장이지만 본 repo 처럼 한국어 / pydantic / FastAPI 같은 modern Python 스택과 충돌 — 별도 표준이 유리.
+
+**Frontend (Phase D):** vitest (단위) + playwright (e2e). 결정.
 
 ---
 

@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>bt_web_bridge</name>
+  <version>0.1.0</version>
+  <description>
+    Web bridge between FastAPI (HTTP REST + WebSocket) and ROS2 (rclpy ActionClient
+    to /bt_execution + ServiceClient to bt_schema_server). Implements Layer 3
+    startup self-check and Layer 4 payload validator from the 4-Layer Defense.
+  </description>
+  <maintainer email="jeongmin.choi@wattrobotics.ai">jeongmin.choi</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <depend>rclpy</depend>
+  <depend>bt_schema_server_interfaces</depend>
+  <depend>btcpp_ros2_interfaces</depend>
+
+  <!--
+    NOTE (v0.1):
+    ament_python 의 strict lint (flake8 import-order I100/I101 + quote Q000
+    + pep257 docstring rules + copyright license 인식) 는 setup.cfg 우회가
+    어려움. v0.1 에서는 lint test 제외하고 unit test 만 유지. lint 정착은
+    docs/04_open_questions.md C-6 (테스트 전략) 의 후속 작업.
+  -->
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

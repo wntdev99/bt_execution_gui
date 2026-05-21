@@ -1,0 +1,21 @@
+# bt_web_bridge default config.
+#
+# bt_web_bridge 는 ROS2 노드 + uvicorn 서버 hybrid 라 ROS parameter 와 CLI
+# 인자 둘 다 사용. 본 yaml 은 ROS parameter 형식이지만 v1 의 main.py 는
+# CLI 인자 우선 (BT_WEB_BRIDGE_CONFIG env var 로 본 yaml 도 참조 가능).
+#
+# 운영 시 launch 인자 또는 환경변수로 override:
+#   ros2 launch bt_web_bridge bt_web_bridge.launch.py \
+#       manifest_dir:=/path/to/behavior_trees \
+#       port:=8000
+
+bt_web_bridge:
+  ros__parameters:
+    # Layer 1 manifest sidecar 디렉토리.
+    # dev-behavior-tree workspace 의 behavior_trees/ 경로.
+    manifest_dir: "/home/jeongmin/Package/ros2/dev-behavior-tree/w_behavior_tree/w_behavior_tree/behavior_trees"
+
+    # HTTP 서버
+    host: "0.0.0.0"
+    port: 8000
+    log_level: "info"
