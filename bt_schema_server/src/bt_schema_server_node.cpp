@@ -30,7 +30,9 @@
 //   ros2 launch bt_schema_server bt_schema_server.launch.py
 #include <filesystem>
 #include <memory>
+#include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "rclcpp/rclcpp.hpp"
@@ -63,6 +65,17 @@ public:
     plugin_lib_names_ =
       declare_parameter<std::vector<std::string>>(
         "plugin_lib_names", std::vector<std::string>{});
+
+    // exposed_tree_ids: ListTrees 응답을 명시 list 로 필터.
+    // dev-behavior-tree 의 behavior_trees 디렉토리에는 root tree 외에 SubTree
+    // (ZoneAwareParamManager / MoveTree / DoorStateMonitor 등) 도 함께 보관됨.
+    // 운영자가 GUI 에서 실행 가능한 트리는 root tree 한정 — sidecar manifest
+    // 가 작성된 트리들. 빈 list (default) 면 backward-compat 으로 등록 트리
+    // 전체 노출. GetTreeSchema 는 본 필터와 무관하게 모든 tree id 에 대해 호출
+    // 가능 (SubTree 재귀 추출 위해).
+    exposed_tree_ids_ =
+      declare_parameter<std::vector<std::string>>(
+        "exposed_tree_ids", std::vector<std::string>{});
 
     if (bt_xml_dir_.empty()) {
       RCLCPP_ERROR(get_logger(), "bt_xml_dir parameter is empty.");
@@ -156,7 +169,20 @@ private:
     std::shared_ptr<bt_schema_server_interfaces::srv::ListTrees::Response> res)
   {
     try {
-      res->tree_ids = parser_.listTreeIds();
+      auto all_ids = parser_.listTreeIds();
+      if (exposed_tree_ids_.empty()) {
+        // Backward-compat: 필터 미설정 시 등록 트리 전체 노출.
+        res->tree_ids = std::move(all_ids);
+      } else {
+        // 운영 의도: sidecar manifest 가 작성된 root tree 만 노출.
+        // exposed_tree_ids_ 에 명시된 id 중 실제 등록된 것만 응답.
+        std::set<std::string> registered(all_ids.begin(), all_ids.end());
+        for (auto & id : exposed_tree_ids_) {
+          if (registered.count(id) > 0) {
+            res->tree_ids.push_back(id);
+          }
+        }
+      }
       res->success = true;
       res->error_message = "";
     } catch (const std::exception & e) {
@@ -203,6 +229,7 @@ private:
 
   std::string bt_xml_dir_;
   std::vector<std::string> plugin_lib_names_;
+  std::vector<std::string> exposed_tree_ids_;
   BT::BehaviorTreeFactory factory_;
   TreeXmlParser parser_;
 

@@ -12,6 +12,22 @@ bt_schema_server:
     # 예: /home/jeongmin/Package/ros2/dev-behavior-tree/w_behavior_tree/w_behavior_tree/behavior_trees
     bt_xml_dir: ""
 
+    # ListTrees 응답으로 노출할 root tree id 목록. dev-behavior-tree 의 behavior_trees/
+    # 디렉토리에는 root tree 외에 SubTree (ZoneAwareParamManager/MoveTree/DoorState
+    # MonitorSubtree 등) 도 함께 보관됨. GUI 에서 직접 실행 가능한 트리는 root 한정 —
+    # sidecar meta.yaml 이 작성된 것들. GetTreeSchema 는 본 필터와 무관하게 모든 등록
+    # 트리에 대해 호출 가능 (SubTree 재귀 추출 위해).
+    #
+    # 빈 list 면 backward-compat 으로 등록 트리 전체 노출.
+    # 운영 시 본 list 와 sidecar meta.yaml 1:1 매칭 — Layer 3 self-check 가 검증.
+    exposed_tree_ids:
+      - DockTree
+      - UndockTree
+      - NavSingleZoneAware
+      - PassDoorScenarioTree
+      - ElevatorBoardingTree
+      - ElevatorAlightingTree
+
     plugin_lib_names:
       # 본 list 는 bt_execution_server.yaml 과 동일하게 유지. CI 의 self-check 가
       # plugin 미등록 시 GetTreeSchema 결과의 manifest 부재로 잡음.
