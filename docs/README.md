@@ -27,6 +27,7 @@
 | 03 | [`03_api_protocol.md`](03_api_protocol.md) | HTTP REST API + WebSocket 이벤트 명세 + payload validation 규칙 |
 | 04 | [`04_open_questions.md`](04_open_questions.md) | 결정 미확정 사항 (UI/UX, DevOps, 기능 확장) |
 | 05 | [`05_handoff_notes.md`](05_handoff_notes.md) | ★ 다른 에이전트가 작업 이어받을 때 알아야 할 함정/주의사항 (구현 과정에서 박제) |
+| 06 | [`06_environment_setup.md`](06_environment_setup.md) | ★ 처음 들어온 사람이 머신에서 실행까지 — OS / ROS / apt / pip / npm / 빌드 / 실행 SSOT |
 
 ---
 

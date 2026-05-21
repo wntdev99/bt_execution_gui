@@ -8,13 +8,17 @@ Behavior Tree (BT) execution 을 위한 운영 GUI. ROS2 머신 위에서 동작
 
 ## 빠른 시작
 
-설계 문서부터 읽으십시오:
+새 머신에서 빌드/실행까지: **[`docs/06_environment_setup.md`](docs/06_environment_setup.md)** (OS / ROS / apt / pip / npm / 빌드 / 실행 SSOT).
+
+설계 문서는 다음 순서:
 
 1. **[`docs/README.md`](docs/README.md)** — 개요 + 메타 원칙 + 결정 사항 + 토폴로지
 2. **[`docs/01_system_design.md`](docs/01_system_design.md)** — 백엔드/프론트엔드/데이터 모델/시나리오 엔진
 3. **[`docs/02_schema_extraction.md`](docs/02_schema_extraction.md)** — 4-Layer Defense + bt_schema_server
 4. **[`docs/03_api_protocol.md`](docs/03_api_protocol.md)** — HTTP REST + WebSocket 명세
 5. **[`docs/04_open_questions.md`](docs/04_open_questions.md)** — 결정 미확정 사항
+6. **[`docs/05_handoff_notes.md`](docs/05_handoff_notes.md)** — 구현 함정 + 핸드오프 노트
+7. **[`docs/06_environment_setup.md`](docs/06_environment_setup.md)** — 환경/의존성 셋업 SSOT
 
 ---
 
