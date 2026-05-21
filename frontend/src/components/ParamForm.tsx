@@ -11,17 +11,17 @@
  *   - PoseStamped    : typed object — x/y/yaw/frame_id (B-22 / docs §2.3)
  *
  * 서버 SSOT (handoff E-6): payload 조립 후 /api/trees/{id}/validate POST. 응답의
- * errors/warnings 를 UI 에 표시. validate OK → /api/execute 호출.
+ * errors/warnings 를 UI 에 표시. validate.valid === true → /api/execute 호출.
  */
 
 import { useState, useTransition } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { api, ApiError } from '@/api/client';
 import { cn } from '@/lib/utils';
-import type { ParamSpec, TreeManifest } from '@/lib/types';
+import type { ParamSpec, TreeDetail } from '@/lib/types';
 
 interface Props {
-  manifest: TreeManifest;
+  manifest: TreeDetail;
   onSubmit?: (executionId: string) => void;
 }
 
@@ -41,9 +41,14 @@ function defaultValue(spec: ParamSpec): FormValue {
   return undefined;
 }
 
-function buildPayload(specs: ParamSpec[], values: Record<string, FormValue>): {
-  params: Record<string, unknown>;
-} {
+/**
+ * Build the `params` map for /api/trees/{id}/validate and /api/execute.
+ * (backend: `body = {'params': req.params or {}}` — params 직접.)
+ */
+function buildParams(
+  specs: ParamSpec[],
+  values: Record<string, FormValue>,
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const spec of specs) {
     const v = values[spec.key];
@@ -76,7 +81,7 @@ function buildPayload(specs: ParamSpec[], values: Record<string, FormValue>): {
       }
     }
   }
-  return { params: out };
+  return out;
 }
 
 export function ParamForm({ manifest, onSubmit }: Props) {
@@ -99,28 +104,30 @@ export function ParamForm({ manifest, onSubmit }: Props) {
     setErrors([]);
     setWarnings([]);
     setSubmitErr(null);
-    const payload = buildPayload(manifest.params, values);
+    const params = buildParams(manifest.params, values);
     startTransition(async () => {
       try {
         // 1. server-side validate (SSOT, handoff E-6)
-        const v = await api.trees.validate(manifest.tree_id, payload);
-        if (!v.ok) {
+        const v = await api.trees.validate(manifest.tree_id, params);
+        if (!v.valid) {
           setErrors(v.errors);
           setWarnings(v.warnings ?? []);
           return;
         }
         setWarnings(v.warnings ?? []);
         // 2. execute
-        const res = await api.execute(manifest.tree_id, payload);
+        const res = await api.execute(manifest.tree_id, params);
         onSubmit?.(res.execution_id);
       } catch (e) {
         if (e instanceof ApiError) {
-          const detail = e.detail as { errors?: string[] } | undefined;
-          if (detail?.errors) {
-            setErrors(detail.errors);
-          } else {
-            setSubmitErr(e.message);
+          // backend VALIDATION_ERROR → details.errors / details.warnings
+          const d = e.details as { errors?: string[]; warnings?: string[] } | undefined;
+          if (d?.errors) {
+            setErrors(d.errors);
+            if (d.warnings) setWarnings(d.warnings);
+            return;
           }
+          setSubmitErr(`${e.code ?? e.status} · ${e.message}`);
         } else {
           setSubmitErr(e instanceof Error ? e.message : '실행 실패');
         }

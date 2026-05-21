@@ -18,63 +18,68 @@ interface MonitorState {
   phase: Phase;
   startedAt: string | null;
   finishedAt: string | null;
-  returnMessage: string;
+  resultMessage: string;
 }
 
 /**
  * Real-time execution monitor.
  *
- * - executionId 가 set 되면 그 후의 WS event 만 필터
+ * - executionId 가 set 되면 그 후의 WS event 만 필터 (data.execution_id 비교)
  * - timeline view (slide-in animation)
- * - 최종 status pulse
+ * - 최종 status pulse + duration
  */
 export function ExecutionMonitor({ executionId, className }: Props) {
   const [state, setState] = useState<MonitorState>({
     phase: 'idle',
     startedAt: null,
     finishedAt: null,
-    returnMessage: '',
+    resultMessage: '',
   });
   const [feed, setFeed] = useState<WsEvent[]>([]);
 
-  // Reset when target execution changes
   useEffect(() => {
     setFeed([]);
     setState({
       phase: executionId ? 'running' : 'idle',
       startedAt: null,
       finishedAt: null,
-      returnMessage: '',
+      resultMessage: '',
     });
   }, [executionId]);
 
   useWebSocket((ev) => {
     if (!executionId) return;
-    const evExecId = (ev as { execution_id?: string }).execution_id;
-    if (!evExecId || evExecId !== executionId) return;
+    const inner = ev.data as { execution_id?: string };
+    if (inner?.execution_id !== executionId) return;
 
     setFeed((prev) => [...prev, ev].slice(-30));
 
     if (ev.type === 'execution_started') {
-      setState((s) => ({ ...s, phase: 'running', startedAt: ev.ts }));
+      setState((s) => ({ ...s, phase: 'running', startedAt: ev.data.started_at }));
     } else if (ev.type === 'execution_finished') {
-      const status = ev.status === 'SUCCESS'
-        ? 'success'
-        : ev.status === 'CANCELLED'
-          ? 'cancelled'
-          : 'failure';
+      const fs = ev.data.final_status;
+      const phase: Phase =
+        fs === 'SUCCESS' ? 'success'
+          : fs === 'CANCELLED' ? 'cancelled'
+            : 'failure';
       setState((s) => ({
         ...s,
-        phase: status,
-        finishedAt: ev.ts,
-        returnMessage: ev.return_message ?? '',
+        phase,
+        finishedAt: ev.data.finished_at,
+        resultMessage: ev.data.result_message ?? '',
       }));
-    } else if (ev.type === 'execution_cancelled') {
+    } else if (ev.type === 'emergency_stopped') {
       setState((s) => ({
         ...s,
         phase: 'cancelled',
         finishedAt: ev.ts,
-        returnMessage: ev.reason ?? '',
+        resultMessage: '긴급 정지',
+      }));
+    } else if (ev.type === 'error') {
+      setState((s) => ({
+        ...s,
+        phase: 'failure',
+        resultMessage: ev.data.message ?? 'error',
       }));
     }
   });
@@ -106,7 +111,9 @@ export function ExecutionMonitor({ executionId, className }: Props) {
       <div className="flex items-baseline justify-between gap-2">
         <div className="flex flex-col gap-1">
           <span className="text-caption text-text-mute">실행 ID</span>
-          <span className="font-mono text-caption tabular text-text">{executionId.slice(0, 18)}…</span>
+          <span className="font-mono text-caption tabular text-text">
+            {executionId.slice(0, 18)}…
+          </span>
         </div>
         <div className="text-right">
           <StatusPulse status={state.phase} />
@@ -135,11 +142,16 @@ export function ExecutionMonitor({ executionId, className }: Props) {
                   <span className="font-mono text-caption text-text">{ev.type}</span>
                 </div>
                 {ev.type === 'execution_feedback' && (
-                  <p className="mt-0.5 text-caption text-text-sub">{ev.message}</p>
+                  <p className="mt-0.5 text-caption text-text-sub">{ev.data.message}</p>
                 )}
                 {ev.type === 'execution_finished' && (
                   <p className="mt-0.5 text-caption text-text-sub">
-                    {ev.node_status} · {ev.return_message}
+                    {ev.data.final_status} · {ev.data.result_message}
+                  </p>
+                )}
+                {ev.type === 'error' && (
+                  <p className="mt-0.5 text-caption text-danger">
+                    {ev.data.code} · {ev.data.message}
                   </p>
                 )}
               </div>
@@ -148,14 +160,14 @@ export function ExecutionMonitor({ executionId, className }: Props) {
         </AnimatePresence>
       </div>
 
-      {state.returnMessage && (
+      {state.resultMessage && (
         <div className={cn(
           'rounded-lg p-3 text-caption',
           state.phase === 'success' && 'bg-success-soft text-success',
           state.phase === 'failure' && 'bg-danger-soft text-danger',
           state.phase === 'cancelled' && 'bg-surface-elev text-text-sub',
         )}>
-          {state.returnMessage}
+          {state.resultMessage}
         </div>
       )}
     </div>

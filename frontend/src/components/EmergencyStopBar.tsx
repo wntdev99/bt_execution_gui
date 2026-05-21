@@ -11,8 +11,8 @@ import type { ActiveExecutionInfo } from '@/lib/types';
  * 운영 critical safety bar — 어디서나 1 클릭 접근.
  *
  * - 상단 고정 (sticky), 좌측 brand + 우측 E-STOP 버튼
- * - active execution 정보 표시 (tree_id + status)
- * - E-STOP 클릭 → confirm dialog → /api/emergency_stop POST
+ * - active execution 정보 표시 (tree_id + RUNNING pulse)
+ * - E-STOP 클릭 → confirm dialog → /api/emergency-stop POST
  * - WebSocket welcome 의 active_execution snapshot 활용 (handoff E-3 — polling 불필요)
  */
 export function EmergencyStopBar() {
@@ -23,18 +23,19 @@ export function EmergencyStopBar() {
 
   useWebSocket((ev) => {
     if (ev.type === 'welcome') {
-      setActive(ev.active_execution);
+      setActive(ev.data.active_execution);
     } else if (ev.type === 'execution_started') {
       setActive({
-        execution_id: ev.execution_id,
-        tree_id: ev.tree_id,
-        status: 'RUNNING',
-        started_at: ev.ts,
-        source: ev.source,
+        execution_id: ev.data.execution_id,
+        kind: ev.data.kind,
+        tree_id: ev.data.tree_id,
+        scenario_id: ev.data.scenario_id,
+        current_step_idx: null,
+        started_at: ev.data.started_at,
       });
     } else if (
       ev.type === 'execution_finished' ||
-      ev.type === 'execution_cancelled'
+      ev.type === 'emergency_stopped'
     ) {
       setActive(null);
     }
@@ -77,7 +78,9 @@ export function EmergencyStopBar() {
           {active ? (
             <div className="flex items-center gap-3 rounded-full bg-surface-elev px-3 py-1.5">
               <StatusPulse status="running" label="RUNNING" />
-              <span className="font-mono text-caption text-text">{active.tree_id}</span>
+              <span className="font-mono text-caption text-text">
+                {active.tree_id ?? `scenario:${active.scenario_id ?? '?'}`}
+              </span>
             </div>
           ) : (
             <StatusPulse status="idle" label="대기" />
@@ -174,7 +177,9 @@ function EmergencyStopConfirm({
             <div className="text-caption text-text-mute">실행 중</div>
             <div className="mt-0.5 flex items-center gap-2">
               <StatusPulse status="running" label="" />
-              <span className="font-mono text-body text-text">{active.tree_id}</span>
+              <span className="font-mono text-body text-text">
+                {active.tree_id ?? `scenario:${active.scenario_id ?? '?'}`}
+              </span>
             </div>
           </div>
         ) : (

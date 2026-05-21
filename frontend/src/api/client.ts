@@ -1,27 +1,35 @@
 /**
  * Thin fetch wrapper for bt_web_bridge.
  *
+ * 모든 응답이 ApiOk envelope (`{ok, data}`) 또는 ApiErr (`{ok: false, error}`).
+ * `request<T>` 가 envelope unwrap — caller 는 data 직접 받음.
+ *
  * Dev 환경에서 /api/* 는 next.config.mjs 의 rewrites 로 :8000 으로 proxy.
  * 운영 시 nginx 동일 origin.
  */
 import type {
-  TreeManifest,
+  TreeListItem,
+  TreeDetail,
   ServerStatus,
-  ValidationResponse,
+  ValidateResponse,
+  ExecuteResponse,
+  ApiErr,
 } from '@/lib/types';
 
 const API_BASE = '/api';
 
 class ApiError extends Error {
-  constructor(public status: number, message: string, public detail?: unknown) {
+  constructor(
+    public status: number,
+    message: string,
+    public code: string | null,
+    public details?: unknown,
+  ) {
     super(message);
   }
 }
 
-async function request<T>(
-  path: string,
-  init?: RequestInit,
-): Promise<T> {
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
@@ -29,49 +37,72 @@ async function request<T>(
       ...(init?.headers || {}),
     },
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    let detail: unknown = text;
-    try {
-      detail = JSON.parse(text);
-    } catch { /* ignore */ }
-    throw new ApiError(res.status, `${res.status} ${res.statusText}`, detail);
+  const text = await res.text().catch(() => '');
+  let body: unknown = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    body = text;
   }
-  if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
+  if (!res.ok) {
+    const err = body as ApiErr | { detail?: { code?: string; message?: string; details?: unknown } } | null;
+    if (err && typeof err === 'object' && 'ok' in err && err.ok === false) {
+      throw new ApiError(res.status, err.error.message, err.error.code, err.error.details);
+    }
+    // FastAPI HTTPException → {detail: {...}} 형식
+    if (err && typeof err === 'object' && 'detail' in err && err.detail) {
+      const d = err.detail as { code?: string; message?: string; details?: unknown };
+      throw new ApiError(res.status, d.message ?? res.statusText, d.code ?? null, d.details);
+    }
+    throw new ApiError(res.status, `${res.status} ${res.statusText}`, null, body);
+  }
+  // Success — envelope unwrap.
+  if (body && typeof body === 'object' && 'ok' in body) {
+    const env = body as { ok: boolean; data?: T };
+    if (env.ok && 'data' in env) {
+      return env.data as T;
+    }
+  }
+  return body as T;
 }
 
 export const api = {
   trees: {
-    list(): Promise<{ trees: TreeManifest[] }> {
+    list(): Promise<TreeListItem[]> {
       return request('/trees');
     },
-    get(treeId: string): Promise<TreeManifest> {
+    get(treeId: string): Promise<TreeDetail> {
       return request(`/trees/${encodeURIComponent(treeId)}`);
     },
-    validate(treeId: string, payload: unknown): Promise<ValidationResponse> {
+    /**
+     * /api/trees/{id}/validate body: `{params: {...}}` (payload.params 직접).
+     */
+    validate(treeId: string, params: Record<string, unknown>): Promise<ValidateResponse> {
       return request(`/trees/${encodeURIComponent(treeId)}/validate`, {
         method: 'POST',
-        body: JSON.stringify({ payload }),
+        body: JSON.stringify({ params }),
       });
     },
   },
   status(): Promise<ServerStatus> {
     return request('/status');
   },
-  execute(treeId: string, payload: unknown): Promise<{ execution_id: string }> {
+  /**
+   * /api/execute body: `{tree_id, payload: {params: {...}}}`.
+   */
+  execute(treeId: string, params: Record<string, unknown>): Promise<ExecuteResponse> {
     return request('/execute', {
       method: 'POST',
-      body: JSON.stringify({ tree_id: treeId, payload }),
+      body: JSON.stringify({ tree_id: treeId, payload: { params } }),
     });
   },
-  cancel(executionId?: string): Promise<{ ok: true }> {
+  cancel(executionId?: string): Promise<{ cancelled: string | null }> {
     return request('/execute/cancel', {
       method: 'POST',
       body: JSON.stringify(executionId ? { execution_id: executionId } : {}),
     });
   },
-  emergencyStop(): Promise<{ ok: true; cancelled: string[] }> {
+  emergencyStop(): Promise<{ cancelled: string[] | null }> {
     return request('/emergency-stop', { method: 'POST' });
   },
 };

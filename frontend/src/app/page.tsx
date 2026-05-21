@@ -3,18 +3,17 @@
 import { useAsync } from '@/hooks/useApi';
 import { api } from '@/api/client';
 import { TreeCard } from '@/components/TreeCard';
-import type { TreeManifest } from '@/lib/types';
 
 /**
  * `/` Dashboard
  *
- * - 트리 카드 grid (6 종 — DockTree/UndockTree/NavSingleZoneAware/PassDoor/Elevator x2)
+ * - 트리 카드 grid (운영 GUI 노출 root tree 자동 fetch)
  * - 카드 hover → /single?tree=... 라우팅
- * - server status + manifest count + self-check timestamp
+ * - server status badge (bt_schema_server / bt_execution_server reachability + tree_count)
  */
 export default function DashboardPage() {
-  const { data, loading, error } = useAsync(() => api.trees.list());
-  const trees: TreeManifest[] = data?.trees ?? [];
+  const { data: trees, loading, error } = useAsync(() => api.trees.list());
+  const list = trees ?? [];
 
   return (
     <div className="flex flex-col gap-10">
@@ -39,17 +38,17 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {loading && !data && <SkeletonGrid />}
+      {loading && list.length === 0 && <SkeletonGrid />}
 
-      {trees.length > 0 && (
+      {list.length > 0 && (
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {trees.map((m, i) => (
-            <TreeCard key={m.tree_id} manifest={m} index={i} />
+          {list.map((m, i) => (
+            <TreeCard key={m.tree_id} item={m} index={i} />
           ))}
         </section>
       )}
 
-      {!loading && trees.length === 0 && !error && (
+      {!loading && list.length === 0 && !error && (
         <div className="rounded-2xl border border-dashed border-border bg-surface p-12 text-center">
           <p className="text-body text-text-sub">
             등록된 트리가 없습니다. bt_schema_server 의 <code className="font-mono">exposed_tree_ids</code> 와
@@ -64,18 +63,20 @@ export default function DashboardPage() {
 function ServerBadge() {
   const { data } = useAsync(() => api.status(), []);
   if (!data) return null;
-  const ok = data.ok && data.ros_connected;
+  const schemaOk = data.bt_schema_server === 'reachable';
+  const execOk = data.bt_execution_server === 'reachable';
+  const ok = schemaOk && execOk;
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3">
-      <span
-        className={`inline-block h-2 w-2 rounded-full ${ok ? 'bg-success' : 'bg-danger'} ${ok && 'animate-pulse'}`}
-      />
+      <span className={`relative inline-block h-2 w-2 rounded-full ${ok ? 'bg-success' : 'bg-warning'}`}>
+        {ok && <span className="absolute inset-0 animate-pulse rounded-full bg-success" />}
+      </span>
       <div className="text-right">
         <div className="font-mono text-caption tabular text-text">
-          {data.manifest_count} trees
+          {data.tree_count} trees
         </div>
         <div className="text-[0.6875rem] text-text-mute">
-          {ok ? 'ROS 연결' : '연결 불안정'}
+          {ok ? 'ROS 연결' : `${schemaOk ? '' : 'schema '}${execOk ? '' : 'exec '}연결 불안정`}
         </div>
       </div>
     </div>

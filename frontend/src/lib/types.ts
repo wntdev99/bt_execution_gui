@@ -1,9 +1,33 @@
 /**
- * Frontend 측 공통 타입.
+ * Frontend 측 공통 타입 — bt_web_bridge backend 와 1:1 매칭.
  *
- * 백엔드 OpenAPI 스키마 (src/api/types.gen.ts) 와 별개로, 본 파일은 도메인 측의
- * 안정된 표현만 둠. OpenAPI 가 generate 되면 그쪽이 source of truth (handoff E-2).
+ * 모든 API 응답이 ApiOk envelope 으로 wrap: `{ok: true, data: <T>}`.
+ * 모든 WebSocket event 도 envelope wrap: `{type, ts, data: <inner>}`.
+ *
+ * 백엔드 SSOT:
+ *   - bt_web_bridge/bt_web_bridge/models.py
+ *   - bt_web_bridge/bt_web_bridge/api/common.py (ok envelope)
+ *   - bt_web_bridge/bt_web_bridge/ws_manager.py:_send (ws envelope)
+ *   - bt_web_bridge/bt_web_bridge/execution_runner.py (ws event 의 inner data)
  */
+
+/* ─────────────────────── ApiOk envelope ─────────────────────── */
+
+export interface ApiOk<T> {
+  ok: true;
+  data: T;
+}
+
+export interface ApiErr {
+  ok: false;
+  error: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
+}
+
+/* ─────────────────────── Manifest types ─────────────────────── */
 
 export type ParamType =
   | 'string'
@@ -24,102 +48,109 @@ export interface ParamSpec {
   note?: string | null;
 }
 
-export interface TreeManifest {
+/** /api/trees 응답의 array 항목 (요약). */
+export interface TreeListItem {
   tree_id: string;
   display_name: string;
   description: string;
-  category: 'single' | 'scenario_step';
-  icon?: string | null;
+  category: string;
+  icon: string | null;
   dangerous: boolean;
-  estimated_duration_sec?: number | null;
-  favorite_default: boolean;
+  estimated_duration_sec: number | null;
+  param_count: number;
+}
+
+/** /api/trees/{id} 응답 (상세). */
+export interface TreeDetail {
+  tree_id: string;
+  display_name: string;
+  description: string;
+  category: string;
+  icon: string | null;
+  dangerous: boolean;
+  estimated_duration_sec: number | null;
   params: ParamSpec[];
 }
 
+/* ─────────────────────── Active / status ─────────────────────── */
+
 export interface ActiveExecutionInfo {
   execution_id: string;
-  tree_id: string;
-  status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILURE' | 'CANCELLED';
+  kind: 'single' | 'scenario';
+  tree_id: string | null;
+  scenario_id: string | null;
+  current_step_idx: number | null;
   started_at: string;
-  source: 'single' | 'scenario_step';
-  scenario_run_id?: string | null;
-  step_idx?: number | null;
 }
 
 export interface ServerStatus {
-  ok: boolean;
-  self_check_passed_at?: string | null;
-  manifest_count: number;
+  bt_web_bridge: string;
+  bt_schema_server: 'reachable' | 'unreachable' | string;
+  bt_execution_server: 'reachable' | 'unreachable' | string;
   active_execution: ActiveExecutionInfo | null;
-  ros_connected: boolean;
+  self_check_passed_at: string | null;
+  tree_count: number;
+  scenario_count: number;
 }
 
-/**
- * WebSocket event envelope — bt_web_bridge 가 broadcast.
- * docs/03_api_protocol.md §3 의 12 종 이벤트.
- *
- * 각 event interface 명시화 — discriminated union narrowing 작동 보장.
- * (catch-all `{ type: string; [k: string]: unknown }` 분기를 두면 union 의
- * 모든 specific 분기가 catch-all 로 폭망 narrowing → TS error 다발.)
- */
-export interface WelcomeEvent {
-  type: 'welcome';
-  ts: string;
-  active_execution: ActiveExecutionInfo | null;
-  server_status: ServerStatus;
-}
-export interface ExecutionStartedEvent {
-  type: 'execution_started';
-  ts: string;
+/* ─────────────────────── Execute / validate responses ─────────────────────── */
+
+export interface ExecuteResponse {
   execution_id: string;
   tree_id: string;
-  source: 'single' | 'scenario_step';
+  started_at: string;
+  warnings: string[];
 }
-export interface ExecutionFeedbackEvent {
-  type: 'execution_feedback';
-  ts: string;
+
+export type ValidateResponse =
+  | { valid: true; warnings: string[] }
+  | { valid: false; errors: string[]; warnings: string[] };
+
+/* ─────────────────────── WebSocket events ─────────────────────── */
+/*
+ * envelope:  {type: string, ts: string, data: <inner>}
+ * inner shapes are per event type — discriminated union below.
+ */
+
+export interface WelcomeSnapshot {
+  active_execution: ActiveExecutionInfo | null;
+}
+
+export interface ExecutionStartedInner {
+  execution_id: string;
+  kind: 'single' | 'scenario';
+  tree_id: string | null;
+  scenario_id: string | null;
+  started_at: string;
+}
+
+export interface ExecutionFeedbackInner {
   execution_id: string;
   message: string;
 }
-export interface ExecutionFinishedEvent {
-  type: 'execution_finished';
-  ts: string;
+
+export interface ExecutionFinishedInner {
   execution_id: string;
-  status: 'SUCCESS' | 'FAILURE' | 'CANCELLED';
-  return_message: string;
-  node_status: string;
+  final_status: 'SUCCESS' | 'FAILURE' | 'CANCELLED' | 'CRASHED' | 'IDLE' | string;
+  result_message: string;
+  finished_at: string;
 }
-export interface ExecutionCancelledEvent {
-  type: 'execution_cancelled';
-  ts: string;
-  execution_id: string;
-  reason: string;
+
+export interface ErrorInner {
+  code: string;
+  message: string;
+  execution_id?: string;
 }
-export interface ScenarioEvent {
-  type:
-    | 'scenario_started'
-    | 'scenario_step_started'
-    | 'scenario_step_finished'
-    | 'scenario_finished'
-    | 'scenario_paused'
-    | 'scenario_resumed';
-  ts: string;
-  scenario_run_id?: string;
-  step_idx?: number;
-  status?: string;
+
+export interface EmergencyStoppedInner {
+  cancelled: string[] | null;
   reason?: string;
 }
 
 export type WsEvent =
-  | WelcomeEvent
-  | ExecutionStartedEvent
-  | ExecutionFeedbackEvent
-  | ExecutionFinishedEvent
-  | ExecutionCancelledEvent
-  | ScenarioEvent;
-
-export interface ValidationResponse {
-  ok: boolean;
-  errors: string[];
-  warnings: string[];
-}
+  | { type: 'welcome'; ts: string; data: WelcomeSnapshot }
+  | { type: 'execution_started'; ts: string; data: ExecutionStartedInner }
+  | { type: 'execution_feedback'; ts: string; data: ExecutionFeedbackInner }
+  | { type: 'execution_finished'; ts: string; data: ExecutionFinishedInner }
+  | { type: 'emergency_stopped'; ts: string; data: EmergencyStoppedInner }
+  | { type: 'error'; ts: string; data: ErrorInner };

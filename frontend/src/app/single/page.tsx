@@ -8,6 +8,7 @@ import { TreeIcon } from '@/components/TreeIcon';
 import { ParamForm } from '@/components/ParamForm';
 import { ExecutionMonitor } from '@/components/ExecutionMonitor';
 import { formatEta } from '@/lib/utils';
+import type { TreeDetail } from '@/lib/types';
 
 /**
  * `/single` — 단일 트리 실행
@@ -36,10 +37,10 @@ function SingleInner() {
 
   const list = useAsync(() => api.trees.list());
   const detail = useAsync(
-    () => (selected ? api.trees.get(selected) : Promise.resolve(null)),
+    () => (selected ? api.trees.get(selected) : Promise.resolve(null as TreeDetail | null)),
     [selected],
   );
-  const trees = list.data?.trees ?? [];
+  const trees = list.data ?? [];
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
