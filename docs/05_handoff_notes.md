@@ -16,6 +16,9 @@
 
 ```
 git log --oneline (origin/main 기준):
+b1b0f68 feat(bt_schema_server): exposed_tree_ids ListTrees filter
+c4b8118 fix(bt_schema_server): SubTree literal binding + OUTPUT port producer
+80a3fda docs: add 05_handoff_notes — 구현 과정 함정 + 다음 agent 가이드
 adda62e feat(bt_web_bridge): C3 — scenario engine + storage + history + endpoints
 60644da feat(bt_web_bridge): C2 — single execution + lock + E-STOP + Validator + WebSocket
 4cba963 feat(bt_web_bridge): C1 — bridge skeleton + Layer 1/3 + /api/trees,status
@@ -25,15 +28,20 @@ a0ca43e feat(bt_schema_server): Layer 2 schema extraction C++ node
 46b1a88 docs: add v1 system design (4-Layer Defense + scenario engine)
 ```
 
+**dev-behavior-tree 측 동시 작업** (sidecar 6 작성 conversation, 2026-05-21):
+- `w_behavior_tree` (refactor/split-interfaces) 51f19ab: behavior_trees/*.meta.yaml × 6
+- `develop_bt` (main) fe76e5a: guide/04 §6 (root tree + sidecar 패턴) + guide/07 §1.4 (.meta.yaml + exposed_tree_ids 임팩트)
+
 완료:
 - 백엔드 풀스택 (Phase A + B + C1 + C2 + C3)
-- 빌드/테스트 통과 (bt_schema_server: 71 tests 0 fail / bt_web_bridge: 52 tests 0 fail)
+- 빌드/테스트 통과 (bt_schema_server: 73 tests 0 fail / bt_web_bridge: 52 tests 0 fail)
 - 모든 endpoints (HTTP 15 + WebSocket 12 이벤트)
 - docs/ 5 개 문서 + 본 핸드오프 노트
+- ★ dev-behavior-tree 측 sidecar manifest 6 개 (Dock/Undock/NavSingleZoneAware/PassDoor/Elevator x2) — self-check 통과 (6 tree(s) verified)
+- ★ bt_schema_server fix 3 종 (SubTree literal / OUTPUT producer / exposed_tree_ids 필터)
 
 미완료:
 - **Phase D — Next.js frontend** (다음 작업)
-- **dev-behavior-tree 측 `*.meta.yaml` sidecar 6 개** (분리 작업 — bt_web_bridge 실행 자체는 가능하나 self-check 통과 못함)
 - v2 — lint 정착 / 위험 액션 confirm / 로봇 사전 점검 등 (`04_open_questions.md` 참조)
 
 ---
@@ -202,6 +210,71 @@ while True:
 ```
 
 `WebSocketDisconnect` 처리 + finally 에서 `ws_manager.disconnect()`. broadcast 는 server → client 만.
+
+### B-9. SubTree literal attribute autoremap 차단 누락 (2026-05-21 fix)
+
+`<SubTree ID="X" mode="realtime" _autoremap="true"/>` 같이 BB 변수 아닌 literal
+attribute 가 schema_builder 의 autoremap 분기에서 child external key 를 부모로
+잘못 전파하던 버그. 시그니처: `ElevatorAlightingTree` 의 `DoorStateMonitorSubtree`
+호출 (mode="realtime") → 부모 external_keys 에 `mode` 가 잘못 포함 → self-check
+가 manifest 와 mismatch 로 fail.
+
+**근본 원인:** `tree_xml_parser.cpp:139` 의 `stripBraces(attr_value).empty()` 가드로
+literal attribute 가 explicit_remaps 에 추가 안 됨. schema_builder 가 child
+external "mode" 를 처리할 때 `explicit_remaps.find("mode")` = none → autoremap
+fallback 분기에서 child key 그대로 부모 전파.
+
+**해결 (c4b8118):**
+- `tree_xml_parser.cpp` 가 literal value 도 explicit_remaps 에 raw 그대로 저장
+  (bindings 에는 추가 안 함 — parent BB 가 아니므로)
+- `schema_builder.cpp` 가 explicit_remaps 처리 시 brace 검사로 BB binding vs literal
+  구분. literal 인 경우 child external key 의 부모 전파 차단.
+
+test: `test_tree_xml_parser.cpp:SubTreeLiteralAttributeTrackedAsRemap` +
+`SubTreeEmptyAttributeIgnored`.
+
+### B-10. OUTPUT/INOUT port BB 매핑 producer 미인식 (2026-05-21 fix)
+
+`<UpdateParam param_status="{param_status}" result_message="{result_message}"/>`
+같이 OUTPUT port 에 BB 변수 매핑된 키가 producer 로 인식 안 되어 external_keys 로
+잘못 노출되던 버그. 시그니처: `DockTree.dock_error_code`, `NavSingleZoneAware
+.param_status`, `PassDoor.finally_param_status/wait_door_path` 등 — 트리 내부에서
+write 되는 값이지만 schema 가 external 로 잡아 self-check 가 manifest 누락 키
+로 fail.
+
+**근본 원인:** `tree_xml_parser` 가 bindings 에 모든 매핑을 추가하지만 producer 는
+script `:=` LHS / `SetBlackboard.output_key` 만 등록. schema_builder 의
+`collectExternalKeys` 에서 direction lookup 은 하되 producer 분류 안 함.
+
+**해결 (c4b8118):**
+- `schema_builder.cpp:collectExternalKeys` 에서 direction=Output/InOut 인 binding 의
+  BB key 를 자동으로 `bindings.producers` 에 등록 → external_keys 계산 시 자동 제외.
+- `buildSchema` 의 internal_keys 채우기 단계에서도 동일 규칙 적용 — root tree 의
+  OUTPUT producer 가 internal_keys 에 포함.
+
+본 fix 가 없으면 모든 root tree 의 manifest 에 OUTPUT BB key 까지 명시해야 self-check
+통과 — 운영자 정신적 부담 + B-22 위반 (typed object 강제 + 의미 없음).
+
+### B-11. ListTrees scope — sidecar 없는 SubTree 가 self-check fail 유발 (2026-05-21 fix)
+
+bt_schema_server 가 `behavior_trees/` 전체 scan 으로 root + SubTree (Move/
+ZoneAwareParamManager/Elevator*Subtree/nav2 정책 등) 모두 등록 → ListTrees 가 54
+개 반환. 단 sidecar manifest 는 root 6 개만 → self-check 가 "manifest 누락 키"
+로 48 개에 대해 fail.
+
+**근본 원인:** schema_server 의 설계 의도는 "모든 트리 등록 → GetTreeSchema 가
+SubTree 재귀 추적 가능". ListTrees 는 "노출 트리" 의도였으나 필터 없이 전체 반환.
+
+**해결 (b1b0f68):**
+- `bt_schema_server.yaml` 에 `exposed_tree_ids` list parameter 추가.
+- `bt_schema_server_node.cpp:onListTrees` 가 list 가 비어 있으면 backward-compat
+  (전체 노출), 비어 있지 않으면 명시된 id 중 실제 등록된 것만 반환.
+- `GetTreeSchema` 는 본 필터와 무관하게 모든 등록 트리에 대해 호출 가능 (SubTree
+  재귀 추출 위해).
+
+**운영 정책:** sidecar `.meta.yaml` ↔ schema_server `exposed_tree_ids` ↔ 운영 GUI
+노출 트리는 1:1:1 매칭. 신규 root tree 추가 시 세 곳 동시 갱신
+(develop_bt/guide/07 §1.4 박제).
 
 ---
 
@@ -404,6 +477,8 @@ websocat ws://localhost:8000/api/ws
 5. **`pep257` 의 `ignore` 항목 setup.cfg 가 pydocstyle 에 전파되는지 미검증** — lint test 제거로 우회됨
 6. **`ros_bridge.py` 의 `wait_for_server_timeout=10.0` 이 hard-coded** — 운영 환경별 override 가능하게 launch 인자로 노출 가치
 7. **scenario `pause` 가 wait step 중간에는 불가** — `_run_wait_step` 의 TODO. v2 작업
+8. **`_RclpyThread._stop()` TypeError** — `bt_web_bridge/main.py:140` 의 `self._stop()` 호출이 `Event` 객체 attribute 라 callable 아님. self-check fail 후 shutdown 경로에서만 발생 — startup 성공 시 미발현. 해결: `self._stop.set()` 으로 수정 또는 spin_thread 의 _stop event 의도 명확화. v2 작업.
+9. **schema_server 의 ros2 multi-instance 위험** — 같은 service 이름으로 두 노드 동시 실행 시 latching 없이 race. 운영 launch 가 systemd 또는 single-instance 가드 필요 (C-1 의 운영 자동화 일부).
 
 ---
 
