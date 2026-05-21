@@ -26,6 +26,7 @@
 | 02 | [`02_schema_extraction.md`](02_schema_extraction.md) | 4-Layer Defense 상세 / bt_schema_server 사양 / manifest yaml 스펙 / startup self-check 알고리즘 |
 | 03 | [`03_api_protocol.md`](03_api_protocol.md) | HTTP REST API + WebSocket 이벤트 명세 + payload validation 규칙 |
 | 04 | [`04_open_questions.md`](04_open_questions.md) | 결정 미확정 사항 (UI/UX, DevOps, 기능 확장) |
+| 05 | [`05_handoff_notes.md`](05_handoff_notes.md) | ★ 다른 에이전트가 작업 이어받을 때 알아야 할 함정/주의사항 (구현 과정에서 박제) |
 
 ---
 
