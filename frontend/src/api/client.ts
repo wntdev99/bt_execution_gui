@@ -14,6 +14,10 @@ import type {
   ValidateResponse,
   ExecuteResponse,
   ApiErr,
+  Scenario,
+  ScenarioListItem,
+  ScenarioRunResponse,
+  ScenarioStep,
 } from '@/lib/types';
 
 const API_BASE = '/api';
@@ -104,6 +108,73 @@ export const api = {
   },
   emergencyStop(): Promise<{ cancelled: string[] | null }> {
     return request('/emergency-stop', { method: 'POST' });
+  },
+
+  /* ── Scenarios CRUD + run controls ── */
+  scenarios: {
+    list(): Promise<ScenarioListItem[]> {
+      return request('/scenarios');
+    },
+    get(scenarioId: string): Promise<Scenario> {
+      return request(`/scenarios/${encodeURIComponent(scenarioId)}`);
+    },
+    create(body: {
+      display_name: string;
+      description?: string;
+      steps: ScenarioStep[];
+    }): Promise<Scenario> {
+      return request('/scenarios', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+    },
+    /**
+     * @param ifMatch Optimistic-lock token (modified_at ISO of the loaded scenario).
+     */
+    update(
+      scenarioId: string,
+      body: {
+        display_name?: string;
+        description?: string;
+        steps?: ScenarioStep[];
+      },
+      ifMatch?: string,
+    ): Promise<Scenario> {
+      const headers: Record<string, string> = {};
+      if (ifMatch) headers['If-Match'] = ifMatch;
+      return request(`/scenarios/${encodeURIComponent(scenarioId)}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(body),
+      });
+    },
+    delete(scenarioId: string): Promise<{ deleted: string }> {
+      return request(`/scenarios/${encodeURIComponent(scenarioId)}`, {
+        method: 'DELETE',
+      });
+    },
+    run(
+      scenarioId: string,
+      mode: 'auto' | 'step_by_step' = 'auto',
+    ): Promise<ScenarioRunResponse> {
+      return request(`/scenarios/${encodeURIComponent(scenarioId)}/run`, {
+        method: 'POST',
+        body: JSON.stringify({ mode }),
+      });
+    },
+    /* Run controls — endpoints under /api/scenarios/run/* */
+    pause(): Promise<{ execution_id: string; will_pause_after_current_step: boolean }> {
+      return request('/scenarios/run/pause', { method: 'POST' });
+    },
+    resume(): Promise<{ execution_id: string; resumed: boolean }> {
+      return request('/scenarios/run/resume', { method: 'POST' });
+    },
+    next(): Promise<{ execution_id: string; advanced: boolean }> {
+      return request('/scenarios/run/next', { method: 'POST' });
+    },
+    cancelRun(): Promise<{ execution_id: string; cancelling: boolean }> {
+      return request('/scenarios/run/cancel', { method: 'POST' });
+    },
   },
 };
 

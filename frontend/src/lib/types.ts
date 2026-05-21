@@ -93,6 +93,48 @@ export interface ServerStatus {
   scenario_count: number;
 }
 
+/* ─────────────────────── Scenario types ─────────────────────── */
+
+export type ScenarioStepKind = 'action' | 'wait';
+
+export interface ScenarioStep {
+  kind: ScenarioStepKind;
+  step_id: string;
+  /** action-only */
+  tree_id?: string | null;
+  /** action-only — { params: { key: typed_object | scalar, ... } } */
+  payload?: { params?: Record<string, unknown> } | null;
+  /** wait-only */
+  seconds?: number | null;
+}
+
+export interface Scenario {
+  id: string;
+  display_name: string;
+  description: string;
+  schema_version: number;
+  created_at: string;
+  modified_at: string;
+  steps: ScenarioStep[];
+}
+
+/** /api/scenarios list item — summary. */
+export interface ScenarioListItem {
+  id: string;
+  display_name: string;
+  description: string;
+  step_count: number;
+  created_at: string;
+  modified_at: string;
+}
+
+export interface ScenarioRunResponse {
+  execution_id: string | null;
+  scenario_id: string;
+  mode: 'auto' | 'step_by_step';
+  started_at: string | null;
+}
+
 /* ─────────────────────── Execute / validate responses ─────────────────────── */
 
 export interface ExecuteResponse {
@@ -147,10 +189,63 @@ export interface EmergencyStoppedInner {
   reason?: string;
 }
 
+/* Scenario WS event inner shapes */
+
+export interface ScenarioPausedInner {
+  execution_id: string;
+  paused_after_step_idx: number;
+  reason: 'user_request' | 'step_by_step_mode' | string;
+}
+
+export interface ScenarioResumedInner {
+  execution_id: string;
+}
+
+export interface ScenarioStepStartedInner {
+  execution_id: string;
+  step_idx: number;
+  step_id: string;
+  kind: ScenarioStepKind;
+  tree_id: string | null;
+}
+
+export interface ScenarioStepFinishedInner {
+  execution_id: string;
+  step_idx: number;
+  status: 'SUCCESS' | 'FAILURE' | 'CANCELLED' | 'CRASHED' | string;
+  result_message: string;
+  duration_ms: number;
+}
+
+export interface ScenarioStepFeedbackInner {
+  execution_id: string;
+  step_idx: number;
+  message: string;
+}
+
+export interface ScenarioCompletedInner {
+  execution_id: string;
+  final_status: 'SUCCESS' | 'FAILURE' | 'CANCELLED' | 'CRASHED' | string;
+  result_message: string;
+  finished_at: string;
+  snapshot: {
+    completed_steps: Array<{ step_idx: number; step_id: string; status: string }>;
+    remaining_steps: string[];
+    cancelled_at_step_idx?: number;
+    failed_step_idx?: number;
+  };
+}
+
 export type WsEvent =
   | { type: 'welcome'; ts: string; data: WelcomeSnapshot }
   | { type: 'execution_started'; ts: string; data: ExecutionStartedInner }
   | { type: 'execution_feedback'; ts: string; data: ExecutionFeedbackInner }
   | { type: 'execution_finished'; ts: string; data: ExecutionFinishedInner }
   | { type: 'emergency_stopped'; ts: string; data: EmergencyStoppedInner }
-  | { type: 'error'; ts: string; data: ErrorInner };
+  | { type: 'error'; ts: string; data: ErrorInner }
+  | { type: 'scenario_paused'; ts: string; data: ScenarioPausedInner }
+  | { type: 'scenario_resumed'; ts: string; data: ScenarioResumedInner }
+  | { type: 'scenario_step_started'; ts: string; data: ScenarioStepStartedInner }
+  | { type: 'scenario_step_finished'; ts: string; data: ScenarioStepFinishedInner }
+  | { type: 'scenario_step_feedback'; ts: string; data: ScenarioStepFeedbackInner }
+  | { type: 'scenario_completed'; ts: string; data: ScenarioCompletedInner };

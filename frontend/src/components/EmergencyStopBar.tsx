@@ -70,7 +70,7 @@ export function EmergencyStopBar() {
         <nav className="ml-2 hidden items-center gap-1 md:flex">
           <NavLink href="/">대시보드</NavLink>
           <NavLink href="/single">단일 실행</NavLink>
-          <NavLink href="/scenarios" disabled>시나리오</NavLink>
+          <NavLink href="/scenarios">시나리오</NavLink>
           <NavLink href="/history" disabled>이력</NavLink>
         </nav>
 
