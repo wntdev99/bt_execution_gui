@@ -117,12 +117,22 @@ createTree 하되 timeout 0 으로 wait 우회. 단 behaviortree_ros2 의 `RosAc
 
 ### 3.2 노드 사양
 
-**패키지명:** `bt_schema_server` (새 ament_cmake 또는 ament_python 패키지)
+**위치:** `bt_execution_gui/bt_schema_server/` (★ 본 repo 안 colcon 패키지)
+**패키지명:** `bt_schema_server` (ament_cmake)
+**인터페이스 패키지:** `bt_execution_gui/bt_schema_server_interfaces/` (★ 본 repo 안 별도 ament_cmake 패키지 — srv 3 종)
 **노드명:** `/bt_schema_server`
 
-언어 선택: **C++ (ament_cmake)** — BT.CPP `BehaviorTreeFactory` 직접 사용 + manifests() 접근. rclpy 로는 BT.CPP 바인딩이 까다로움.
+언어 선택: **C++ (ament_cmake)** — BT.CPP `BehaviorTreeFactory` 직접 사용 + `manifests()` 접근. rclpy 로는 BT.CPP 바인딩이 까다로움.
+
+**왜 본 repo 안인가:**
+- 단방향 의존 강화 — dev-behavior-tree 는 BT 자체 SSOT 만 책임, 운영 도구는 본 repo
+- 버전 동기화 단순화 — srv 인터페이스 변경 시 bt_web_bridge 와 동시 PR (호환 매트릭스 불필요)
+- 권한 격리 — BT 작성자 권한과 운영 도구 권한 분리
+- ROS2 best practice — interfaces 별도 패키지 (`w_behavior_tree_interfaces` 패턴 일관)
 
 ### 3.3 ROS 인터페이스
+
+모두 `bt_execution_gui/bt_schema_server_interfaces/srv/` 에 정의:
 
 #### 3.3.1 `srv/ListTrees.srv`
 
@@ -610,11 +620,12 @@ pass_final_goal_tol  [____0.0____]  ⚠
 | Layer | 작업량 | 위치 |
 |---|---|---|
 | 1 | 트리 1 개당 ~30 라인 yaml | `dev-behavior-tree/.../behavior_trees/*.meta.yaml` |
-| 2 | ~400 라인 C++ + srv 3 종 | 신규 `dev-behavior-tree/bt_schema_server` 패키지 |
+| 2 | ~400 라인 C++ + ~10 라인 srv 3 종 | `bt_execution_gui/bt_schema_server/` + `bt_execution_gui/bt_schema_server_interfaces/` (★ 본 repo) |
 | 3 | ~150 라인 Python | `bt_execution_gui/bt_web_bridge/self_check.py` |
 | 4 | ~150 라인 Python + ~100 라인 TS | `bt_execution_gui/bt_web_bridge/payload_validator.py` + frontend |
 
 **bt_execution_server 본체는 무수정 ✅**
+**dev-behavior-tree 측 변경 최소화** — Layer 1 sidecar yaml 6 개 + 가이드 갱신만.
 
 ---
 

@@ -27,7 +27,8 @@ Behavior Tree (BT) execution 을 위한 운영 GUI. ROS2 머신 위에서 동작
 | 트리 메타데이터 | 트리별 sidecar `.meta.yaml` (각 트리 옆) |
 | 시나리오 저장 | yaml (시나리오) + sqlite (이력) |
 | Schema 추출 | 4-Layer Defense |
-| Layer 2 | 별도 `bt_schema_server` ROS2 노드 |
+| Layer 2 | 별도 `bt_schema_server` ROS2 노드 (**본 repo 안** colcon 패키지) |
+| Schema srv 정의 | `bt_schema_server_interfaces` (**본 repo 안** 별도 ament_cmake 패키지) |
 | 배포 | colcon package + systemd service |
 | 인증 | 사내망 신뢰 + CORS 제한 (v1) |
 | 시나리오 빌더 | Linear + 대기 + Pause/Step-by-step (액션 경계 한정) |
@@ -35,8 +36,22 @@ Behavior Tree (BT) execution 을 위한 운영 GUI. ROS2 머신 위에서 동작
 
 ---
 
+## Repo 구조 (운영 도구 풀스택)
+
+본 repo 가 운영 도구 전체를 책임집니다. 4 개 컴포넌트 패키지 + docs:
+
+```
+bt_execution_gui/
+├── bt_schema_server_interfaces/   # ROS srv 정의 (ament_cmake, rosidl)
+├── bt_schema_server/              # Layer 2 ROS 노드 (ament_cmake, C++)
+├── bt_web_bridge/                 # Layer 3+4 + FastAPI (ament_python, Python)
+├── frontend/                      # Next.js 14 GUI (npm)
+├── deploy/                        # systemd unit 등
+└── docs/                          # 설계 SSOT
+```
+
 ## 관련 Repo
 
-- [`dev-behavior-tree`](https://github.com/...) — BT 작성 SSOT. `behavior_trees/*.xml` + `develop_bt/guide/` + (예정) `bt_schema_server` 패키지 + `behavior_trees/*.meta.yaml`.
+- [`dev-behavior-tree`](https://github.com/...) — BT 작성 SSOT. `behavior_trees/*.xml` + `develop_bt/guide/` + (예정) `behavior_trees/*.meta.yaml` sidecar.
 
-본 repo (`bt_execution_gui`) 는 dev-behavior-tree 에 의존하지만, dev-behavior-tree 는 본 repo 에 의존하지 않습니다 (단방향).
+본 repo (`bt_execution_gui`) 는 dev-behavior-tree 에 의존하지만, dev-behavior-tree 는 본 repo 에 의존하지 않습니다 (**단방향**).

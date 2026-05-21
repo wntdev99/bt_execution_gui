@@ -137,11 +137,16 @@ WantedBy=multi-user.target
 
 ### C-2. dev-behavior-tree ↔ bt_execution_gui 호환성
 
-**상태:** 미결정.
-**고려:**
-- bt_schema_server 의 srv 인터페이스 변경 시 buddy-version 필요.
-- README 에 호환 매트릭스 박제?
-**제안:** semantic versioning. bt_execution_gui v1.x ↔ bt_schema_server srv v1.x. 변경 시 마이너 버전 bump 및 호환 표 갱신.
+**상태:** [결정: 2026-05-21] `bt_schema_server` + `bt_schema_server_interfaces` 를 본 repo (`bt_execution_gui`) 로 통합 → buddy-version 호환 매트릭스 불필요.
+
+**근거:** schema service 인터페이스는 본 repo 안에서 자체 완결 — bt_schema_server ↔ bt_web_bridge 변경이 단일 commit/PR 로 처리.
+
+**남은 호환 표면 (작음):**
+- `behavior_trees/*.meta.yaml` schema (Layer 1 manifest) — dev-behavior-tree 의 sidecar yaml 형식 변경 시 본 repo `manifest_loader` 영향. yaml 의 `schema_version` 필드로 관리 (A-1).
+- `bt_execution_server` 의 자동 주입 키 5 종 (`node` / `server_timeout` / `bt_loop_duration` / `wait_for_service_timeout` / `tf_buffer`) — dev-behavior-tree 측 변경 시 bt_schema_server 의 "자동 주입 제외 list" 코드 상수도 갱신 필요. **drift 시 Layer 3 self-check 가 즉시 잡음.**
+- `plugin_lib_names` (dev-behavior-tree 의 `bt_execution_server.yaml`) — bt_schema_server 도 동일 plugin 들을 dlopen 해야 함. bt_schema_server 의 launch 파라미터로 동일 list 주입.
+
+**제안:** 본 repo 와 dev-behavior-tree 의 release tag 는 별도 운영. CI 가 매 PR 마다 self-check 통합 검증.
 
 ### C-3. CI / GitHub Actions
 
@@ -278,3 +283,4 @@ WantedBy=multi-user.target
 | 2026-05-21 | 인증 사내망 신뢰 + CORS | 사용자 결정 (v1) |
 | 2026-05-21 | 시나리오 linear + Pause/Step-by-step (액션 경계) | 사용자 결정. BT mid-tick pause 불가 한계 박제 |
 | 2026-05-21 | 안전 = E-STOP 만 (v1) | 사용자 결정. confirm 모달/사전 점검은 v2 |
+| 2026-05-21 | `bt_schema_server` + `bt_schema_server_interfaces` 를 본 repo (bt_execution_gui) 로 통합 | 단방향 의존 강화 / 권한 격리 (BT 작성 vs 운영 도구) / 버전 동기화 단순화 (단일 commit/PR) / ROS2 interfaces 별도 패키지 컨벤션 (`w_behavior_tree_interfaces` 패턴 일관). dev-behavior-tree 측 변경은 sidecar yaml 6 개 + 가이드 갱신만으로 최소화. Open Question C-2 자동 해소. |

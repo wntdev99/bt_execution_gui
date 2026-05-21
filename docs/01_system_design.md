@@ -9,19 +9,41 @@
 README §3 참조. 핵심 요점:
 
 - **단일 머신** (192.168.34.202) 에 모든 ROS2 노드 + 웹 서버.
-- **bt_web_bridge** 는 rclpy 기반 ament_python 패키지. ROS2 와 HTTP/WS 양쪽 다리.
-- **bt_schema_server** 는 신규 별도 노드. Schema 추출 전용 (B-11 회피 위해 실 액션 client 안 만듦).
-- **bt_execution_server** 는 무수정 — 기존 동작 유지.
+- **bt_web_bridge** 는 rclpy 기반 ament_python 패키지 (★ 본 repo). ROS2 와 HTTP/WS 양쪽 다리.
+- **bt_schema_server** 는 신규 별도 노드 (★ 본 repo 의 ament_cmake C++ 패키지). Schema 추출 전용 — B-11 회피 위해 createTree 생략, factory.manifests() + XML 파서만 사용.
+- **bt_schema_server_interfaces** 는 srv 정의 별도 패키지 (★ 본 repo, ament_cmake + rosidl).
+- **bt_execution_server** 는 dev-behavior-tree 의 기존 노드 — 무수정.
 
 ---
 
 ## 2. bt_web_bridge — 백엔드 책임
 
-### 2.1 패키지 구조
+### 2.1 패키지 구조 (본 repo 전체 — 운영 도구 풀스택)
 
 ```
 bt_execution_gui/
-├── bt_web_bridge/                  # ament_python 패키지
+├── bt_schema_server_interfaces/   # ROS2 패키지 #1 (ament_cmake, rosidl)
+│   ├── package.xml
+│   ├── CMakeLists.txt
+│   └── srv/
+│       ├── ListTrees.srv
+│       ├── GetTreeSchema.srv
+│       └── GetNodesModel.srv
+│
+├── bt_schema_server/              # ROS2 패키지 #2 (ament_cmake, C++)
+│   ├── package.xml
+│   ├── CMakeLists.txt
+│   ├── include/bt_schema_server/
+│   ├── src/
+│   │   ├── bt_schema_server_node.cpp
+│   │   ├── tree_xml_parser.cpp     # XML → 노드 트리 + BB 매핑 추출
+│   │   ├── script_key_extractor.cpp # _skipIf 등 script BB key 파서
+│   │   └── schema_builder.cpp      # external_keys / internal_keys 분류
+│   ├── launch/bt_schema_server.launch.py
+│   ├── config/bt_schema_server.yaml   # plugin_lib_names + bt_xml_dir
+│   └── test/
+│
+├── bt_web_bridge/                  # ROS2 패키지 #3 (ament_python, FastAPI)
 │   ├── package.xml
 │   ├── setup.py
 │   ├── setup.cfg
@@ -46,11 +68,21 @@ bt_execution_gui/
 │   │   │   └── ws.py               # WebSocket
 │   │   └── models.py               # pydantic schemas
 │   └── test/
-├── frontend/                       # Next.js 14
+│
+├── frontend/                       # Next.js 14 (npm, 비 ROS2)
 │   ├── package.json
-│   ├── ...
+│   └── ...
+│
+├── deploy/                         # systemd unit 등 (Open Question C-1)
+│   └── systemd/
+│       ├── bt_schema_server.service
+│       ├── bt_web_bridge.service
+│       └── bt_frontend.service     # nginx 또는 next start
+│
 └── docs/
 ```
+
+3 개 colcon 패키지 + 1 개 npm 프로젝트. 각자 빌드 시스템 격리. `colcon build --packages-select` 로 부분 빌드 가능.
 
 ### 2.2 ROS2 ↔ FastAPI 동시 실행 패턴
 
@@ -579,17 +611,51 @@ async def run_single(tree_id: str, payload: dict):
 
 ## 6. 본 repo 통합 영향
 
-dev-behavior-tree repo 에 추가될 자산:
+### 6.1 bt_execution_gui (★ 본 repo) 에 신규 추가될 자산
+
+| 위치 | 작업 | 책임 |
+|---|---|---|
+| `bt_schema_server_interfaces/` (신규 ament_cmake 패키지) | 신규 | srv 3 종 (ListTrees / GetTreeSchema / GetNodesModel) |
+| `bt_schema_server/` (신규 ament_cmake C++ 패키지) | 신규 | Layer 2 — factory.manifests() + XML 파서 + script key extractor |
+| `bt_web_bridge/` (신규 ament_python 패키지) | 신규 | Layer 3+4 + FastAPI + 시나리오 엔진 + WebSocket |
+| `frontend/` (npm Next.js 프로젝트) | 신규 | UI |
+| `deploy/systemd/*.service` | 신규 | 3 개 unit (Open Question C-1) |
+| `.github/workflows/` | 신규 | CI (lint + colcon build + self-check) |
+
+### 6.2 dev-behavior-tree repo 에 추가될 자산 (★ 최소화)
 
 | 파일 | 작업 | 책임 |
 |---|---|---|
-| `w_behavior_tree_interfaces/srv/GetTreeSchema.srv` | 신규 | bt_schema_server 인터페이스 |
-| `w_behavior_tree_interfaces/srv/ListTrees.srv` | 신규 | 동일 |
-| `w_behavior_tree_interfaces/CMakeLists.txt` | 수정 | rosidl_generate_interfaces 에 추가 |
-| 신규 `bt_schema_server` 패키지 또는 `w_behavior_tree` 안 신규 노드 | 신규 | 02_schema_extraction.md 참조 |
-| `behavior_trees/*.meta.yaml` (6 개) | 신규 | Layer 1 manifest |
+| `behavior_trees/<TreeName>.meta.yaml` (6 종) | 신규 | Layer 1 manifest sidecar |
 | `develop_bt/guide/04_node_catalog/package_custom.md` | 갱신 | 트리 목록 + meta.yaml 패턴 박제 |
 | `develop_bt/guide/07_change_impact_matrix.md` | 갱신 | 새 트리 추가 시 .meta.yaml 도 생성 항목 추가 |
+
+→ schema server / interfaces / web bridge / frontend 는 모두 **본 repo 안에서 자체 완결**. dev-behavior-tree 측 변경 영향 최소화 — sidecar yaml 6 개 + 가이드 문서 갱신만.
+
+### 6.3 빌드/배포 흐름
+
+```bash
+# 1. dev-behavior-tree workspace setup
+cd ~/ros2_ws/src
+git clone <dev-behavior-tree>
+git clone <bt_execution_gui>
+
+# 2. ROS2 패키지 일괄 빌드
+cd ~/ros2_ws
+colcon build --packages-select \
+    w_behavior_tree_interfaces w_behavior_tree \
+    bt_schema_server_interfaces bt_schema_server bt_web_bridge
+
+# 3. Frontend 빌드 (별도)
+cd src/bt_execution_gui/frontend
+npm install && npm run build
+
+# 4. 실행 (systemd 또는 launch)
+source ~/ros2_ws/install/setup.bash
+ros2 launch bt_schema_server bt_schema_server.launch.py &
+ros2 launch bt_web_bridge bt_web_bridge.launch.py &
+# (frontend 는 next start 또는 nginx 서빙)
+```
 
 ---
 
