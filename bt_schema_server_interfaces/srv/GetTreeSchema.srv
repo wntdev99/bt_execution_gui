@@ -1,0 +1,7 @@
+# GetTreeSchema - extract external (payload) BB keys + types for a tree.
+# schema_json schema: see README.md and docs/02_schema_extraction.md.
+string tree_id
+---
+bool success
+string error_message
+string schema_json

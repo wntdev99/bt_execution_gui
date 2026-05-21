@@ -1,0 +1,6 @@
+# ListTrees - return all registered BehaviorTree IDs.
+# See README.md for full description.
+---
+bool success
+string error_message
+string[] tree_ids

@@ -1,0 +1,7 @@
+# GetNodesModel - return BT::writeTreeNodesModelXML result.
+# Groot2-compatible node port metadata.
+bool include_builtin
+---
+bool success
+string error_message
+string tree_nodes_model_xml
