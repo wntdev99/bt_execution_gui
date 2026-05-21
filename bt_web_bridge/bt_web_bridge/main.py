@@ -125,19 +125,22 @@ def build_app(
 class _RclpyThread(threading.Thread):
     """Background thread spinning the rclpy executor."""
 
+    # NOTE: `_stop` 이름 회피 — threading.Thread 가 동일 이름의 private method
+    # 를 보유. attribute 로 덮어쓰면 Thread.join() 내부 _wait_for_tstate_lock 의
+    # self._stop() 호출이 Event 객체에 도달 → TypeError. 따라서 `_stop_event`.
     def __init__(self, executor: SingleThreadedExecutor) -> None:
         super().__init__(daemon=True, name='rclpy-spin')
         self._executor = executor
-        self._stop = threading.Event()
+        self._stop_event = threading.Event()
 
     def run(self) -> None:
         """Spin until stop() is called or rclpy shuts down."""
-        while not self._stop.is_set() and rclpy.ok():
+        while not self._stop_event.is_set() and rclpy.ok():
             self._executor.spin_once(timeout_sec=0.1)
 
     def stop(self) -> None:
         """Signal the thread to exit at the next loop iteration."""
-        self._stop.set()
+        self._stop_event.set()
 
 
 async def _amain(args: argparse.Namespace) -> int:

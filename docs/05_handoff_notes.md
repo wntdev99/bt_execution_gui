@@ -281,6 +281,24 @@ SubTree 재귀 추적 가능". ListTrees 는 "노출 트리" 의도였으나 필
 노출 트리는 1:1:1 매칭. 신규 root tree 추가 시 세 곳 동시 갱신
 (develop_bt/guide/07 §1.4 박제).
 
+### B-12. threading.Thread private attribute 이름 충돌 (2026-05-21 fix)
+
+`bt_web_bridge/main.py:_RclpyThread.__init__` 의 `self._stop = threading.Event()`
+가 `threading.Thread` 의 private method `_stop` 을 attribute 로 덮어쓰던 버그.
+Thread.join() 의 `_wait_for_tstate_lock` 이 `self._stop()` 을 호출 → Event 객체는
+callable 아님 → `TypeError: 'Event' object is not callable`.
+
+발현 시그니처: self-check fail 후 shutdown 경로 (정상 exit 도 동일하지만 traceback
+이 stderr 로 나옴). startup 성공 + uvicorn run 동안은 미발현.
+
+**해결:** attribute 이름 `_stop` → `_stop_event` rename. run/stop 메서드 안 사용도
+같이 갱신.
+
+**일반 원칙:** `threading.Thread` 를 상속할 때 attribute 이름 회피 list:
+`_stop`, `_target`, `_args`, `_kwargs`, `_started`, `_initialized`, `_tstate_lock`.
+private API 라 Python 버전별 변동 가능 — `_stop_event` / `_done` 같은 명시적
+이름 권장.
+
 ---
 
 ## C. 운영 / 통합 함정
@@ -482,7 +500,7 @@ websocat ws://localhost:8000/api/ws
 5. **`pep257` 의 `ignore` 항목 setup.cfg 가 pydocstyle 에 전파되는지 미검증** — lint test 제거로 우회됨
 6. **`ros_bridge.py` 의 `wait_for_server_timeout=10.0` 이 hard-coded** — 운영 환경별 override 가능하게 launch 인자로 노출 가치
 7. **scenario `pause` 가 wait step 중간에는 불가** — `_run_wait_step` 의 TODO. v2 작업
-8. **`_RclpyThread._stop()` TypeError** — `bt_web_bridge/main.py:140` 의 `self._stop()` 호출이 `Event` 객체 attribute 라 callable 아님. self-check fail 후 shutdown 경로에서만 발생 — startup 성공 시 미발현. 해결: `self._stop.set()` 으로 수정 또는 spin_thread 의 _stop event 의도 명확화. v2 작업.
+8. ~~**`_RclpyThread._stop()` TypeError**~~ — 해결됨 (B-12 박제). attribute 이름을 `_stop` → `_stop_event` 로 rename 하여 `threading.Thread` 의 private method 와 충돌 회피.
 9. **schema_server 의 ros2 multi-instance 위험** — 같은 service 이름으로 두 노드 동시 실행 시 latching 없이 race. 운영 launch 가 systemd 또는 single-instance 가드 필요 (C-1 의 운영 자동화 일부).
 
 ---
