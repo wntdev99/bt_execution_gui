@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """bt_web_bridge — ament_python setup."""
+import glob
+
 from setuptools import find_packages, setup
 
 PACKAGE_NAME = 'bt_web_bridge'
@@ -28,6 +30,12 @@ setup(
          ['launch/bt_web_bridge.launch.py']),
         ('share/' + PACKAGE_NAME + '/config',
          ['config/bt_web_bridge.yaml']),
+        # Layer 1 sidecar manifests — bt_execution_gui 자체 자산.
+        # 운영 GUI 노출 root tree (Dock/Undock/NavSingleZoneAware/PassDoor/
+        # Elevator x2) 의 운영 메타 (display_name/dangerous/params 등).
+        # bt_schema_server.yaml 의 exposed_tree_ids 와 1:1 매칭.
+        ('share/' + PACKAGE_NAME + '/manifests',
+         glob.glob('manifests/*.meta.yaml')),
     ],
     install_requires=[
         'setuptools',

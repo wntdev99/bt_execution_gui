@@ -1,0 +1,104 @@
+# bt_execution_gui Layer 1 — PassDoorScenarioTree sidecar manifest
+# SSOT: bt_execution_gui/docs/02_schema_extraction.md §2
+# 대응 트리: behavior_trees/PassDoorScenarioTree.xml
+# SubTree 의존: MoveTree, ZoneAwareParamManager
+tree_id: PassDoorScenarioTree
+display_name: "자동문 통과 (v2 fail-safe)"
+description: |
+  자동문 통과 5단계 시나리오 (door_approach 도착 → 문 열기 → 열림 대기 →
+  통과 시도 → 문 닫기) + Step 4 의 case A/B/C fail-safe + 외곽 Timeout 180s.
+  Zone 인식 파라미터 자동 전환 병렬 + finally 의 default alias 복원 + path 추종 cancel.
+  case C 의 timeout-SUCCESS 승격 — 외곽 Timeout 만료 시 robot 이 안 걸침+inside side
+  면 SUCCESS 로 승격.
+category: single
+dangerous: true
+estimated_duration_sec: 180
+params:
+  # ── ZoneAwareParamManager 외부 BB key ──────────────────────────────────────
+  - key: param_config
+    type: string
+    required: true
+    description: "UpdateParam config 파일 경로 (param_sets.yaml)."
+  - key: zone_group
+    type: string
+    required: true
+    description: 'ZoneAware 모니터링 zone group id (예: "narrow_door").'
+  - key: zone_param_alias
+    type: string
+    required: true
+    description: 'Zone 진입 시 적용 alias (예: "mppi_narrow").'
+  - key: default_param_alias
+    type: string
+    required: true
+    description: '기본 파라미터 alias (예: "mppi_default"). Finally 가 복원.'
+  # ── 도어 위치 / 라인 (PoseStamped) ────────────────────────────────────────
+  - key: door_approach_pose
+    type: PoseStamped
+    required: true
+    description: "문 앞 정지 위치 (Step 1 목적지 + Case B 후퇴 시 재사용)."
+  - key: door_inside_pose
+    type: PoseStamped
+    required: true
+    description: "문 안쪽 도달 위치 (Step 4 목적지)."
+  - key: door_line_p1
+    type: PoseStamped
+    required: true
+    description: "문 라인 끝점 1 (문틀 한쪽 기둥). IsFootprintOnDoorLine 판정 기준."
+  - key: door_line_p2
+    type: PoseStamped
+    required: true
+    description: "문 라인 끝점 2 (문틀 반대쪽 기둥)."
+  # ── 도어 서비스 ────────────────────────────────────────────────────────────
+  - key: door_service_name
+    type: string
+    required: true
+    description: 'SetBool 서비스 이름 (예: "/autodoor_2/set_open"). Step 2/5 가 호출.'
+  # ── tolerance (Step 1 / Step 4) ────────────────────────────────────────────
+  - key: door_approach_pass_tol
+    type: double
+    required: false
+    default: 0.0
+    range: [0.0, 1.0]
+    note: |
+      Step 1 (door_approach 도착) MoveTree 의 pass_final_goal_tol (B-30).
+      0.0 = 정확 도달 (비활성). >0 시 일찍 SUCCESS — Step 2 (문 열기) 진입 빨라짐.
+    description: "Step 1 의 통과 판정 임계값 (m)."
+  - key: door_inside_pass_tol
+    type: double
+    required: false
+    default: 0.0
+    range: [0.0, 1.0]
+    note: |
+      Step 4 (door_inside 도달) MoveTree 의 pass_final_goal_tol (B-30).
+      0.0 = 정확 도달. >0 시 일찍 SUCCESS — controller_server 의 잔여 cmd_vel
+      이 일찍 멈춤. finally 의 CancelControl 이 보완.
+    description: "Step 4 (내부 MoveTree) 의 통과 판정 임계값 (m)."
+  # ── MoveTree 잔여 autoremap 키 (default 사용 가능) ─────────────────────────
+  - key: timeout_ms
+    type: int
+    required: false
+    default: 30000
+    range: [1000.0, 600000.0]
+    description: "MoveTree 네비게이션 타임아웃 (ms). 각 Step 의 외곽 Timeout 과 별개."
+  - key: replan_period_ms
+    type: int
+    required: false
+    default: 1000
+    range: [100.0, 60000.0]
+    description: "MoveTree 경로 재계획 주기 (ms)."
+  - key: goal_checker_name
+    type: string
+    required: false
+    default: ""
+    description: "MoveTree NavSingle 의 goal_checker plugin. 빈 string = navigator default."
+  - key: progress_checker_name
+    type: string
+    required: false
+    default: ""
+    description: "MoveTree NavSingle 의 progress_checker plugin. 빈 string = navigator default."
+  - key: recovery_mode
+    type: string
+    required: false
+    default: ""
+    enum: ["", "stop_and_go", "avoidance"]
+    description: "MoveTree 회복 모드. 빈 string = navigator 자동 결정."

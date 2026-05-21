@@ -36,7 +36,7 @@
 |---|---|---|---|
 | 1 | 백엔드 | Python + rclpy + FastAPI + uvicorn | async ROS2 ActionClient + WebSocket |
 | 2 | 프론트엔드 | Next.js 14 (App Router) + TypeScript + Tailwind CSS + shadcn/ui | 토스풍 디자인, dnd-kit, react-flow |
-| 3 | 트리 메타데이터 | 트리별 sidecar `.meta.yaml` (각 트리 옆) | `dev-behavior-tree` repo 의 `behavior_trees/*.meta.yaml` |
+| 3 | 트리 메타데이터 | 트리별 sidecar `.meta.yaml` (bt_execution_gui 자체 자산) | `bt_execution_gui/bt_web_bridge/manifests/*.meta.yaml` (2026-05-21 재결정) |
 | 4 | 시나리오 저장 | yaml 파일 (git tracked) | `bt_execution_gui/scenarios/*.yaml` |
 | 5 | 실행 이력 | sqlite | `bt_execution_gui/data/history.db` (runtime path) |
 | 6 | Schema 추출 구조 | **4-Layer Defense** | §02 참조 |
@@ -95,9 +95,11 @@
 ```
 [bt_execution_gui]                    [dev-behavior-tree]
 ├── bt_schema_server_interfaces/      ├── w_behavior_tree/             (BT XML + plugins)
-├── bt_schema_server/         ──────→ │   └── behavior_trees/*.meta.yaml  (★ 신규 sidecar)
-├── bt_web_bridge/            ──────→ ├── w_behavior_tree_interfaces/  (ExecuteTree.action — 실은 btcpp_ros2_interfaces)
-└── frontend/                         └── develop_bt/guide/             (BT 방법론)
+├── bt_schema_server/         ──────→ │   └── behavior_trees/*.xml      (BT 자체)
+├── bt_web_bridge/                    ├── w_behavior_tree_interfaces/  (ExecuteTree.action — 실은 btcpp_ros2_interfaces)
+│   └── manifests/*.meta.yaml         └── develop_bt/guide/             (BT 방법론)
+│      (★ 운영 sidecar manifest — bt_execution_gui 자체 자산)
+└── frontend/
 ```
 
 ### dev-behavior-tree 자산 → bt_execution_gui 활용
@@ -105,22 +107,22 @@
 | dev-behavior-tree 자산 | bt_execution_gui 활용 |
 |---|---|
 | `behavior_trees/*.xml` | tree_id 목록 source — `bt_schema_server` 가 디렉토리 scan |
-| `behavior_trees/*.meta.yaml` (신규 추가될 sidecar) | Layer 1 manifest. bt_web_bridge 가 로드 |
+| ~~`behavior_trees/*.meta.yaml`~~ (2026-05-21 재결정 — bt_execution_gui 측으로 이동) | (해당 없음) Layer 1 manifest 는 `bt_execution_gui/bt_web_bridge/manifests/` 가 SSOT |
 | `bt_execution_server` 의 `/bt_execution` action (`btcpp_ros2_interfaces/action/ExecuteTree`) | bt_web_bridge 의 ActionClient 대상 |
 | `bt_execution_server` 의 `plugin_lib_names` yaml | bt_schema_server 가 동일 plugin 들을 dlopen (factory.manifests() 추출) |
 | `bt_execution_server.cpp:103-113` 의 자동 주입 키 5 종 | bt_schema_server 의 "자동주입 제외 list" 코드 상수 |
 | `develop_bt/guide/05_patterns_and_pitfalls.md` (B-22 등) | manifest yaml 의 `note` / `range` 필드 작성 가이드 |
 | `develop_bt/guide/06_error_codes_reference.md` §11.5 | Layer 4 + UI 친화적 에러 메시지 매트릭스 |
 
-### dev-behavior-tree 측에 추가될 자산 (최소화 — sidecar yaml + 가이드 갱신만)
+### dev-behavior-tree 측에 추가될 자산 (최소화 — 가이드 갱신만)
 
 | 파일 | 작업 | 책임 |
 |---|---|---|
-| `behavior_trees/<TreeName>.meta.yaml` (6 종) | 신규 | Layer 1 manifest sidecar |
-| `develop_bt/guide/04_node_catalog/package_custom.md` | 갱신 | 트리 목록 + meta.yaml 패턴 박제 |
-| `develop_bt/guide/07_change_impact_matrix.md` | 갱신 | 새 트리 추가 시 .meta.yaml 도 생성 항목 추가 |
+| `develop_bt/guide/04_node_catalog/package_custom.md` | 갱신 | 운영 GUI 노출 root tree 목록 + sidecar 위치 (bt_execution_gui 측) 박제 |
+| `develop_bt/guide/07_change_impact_matrix.md` | 갱신 | 새 root tree 추가 시 bt_execution_gui 측 sidecar + exposed_tree_ids 등록 항목 |
 
-→ **schema server / interfaces / web bridge / frontend 는 모두 본 repo 안에서 자체 완결.** dev-behavior-tree 측 변경 영향 최소화.
+→ **manifest + schema server + interfaces + web bridge + frontend 모두 본 repo 안에서 자체 완결.**
+dev-behavior-tree 측은 BT XML 자체와 가이드 박제만 — 운영 메타 책임 zero.
 
 bt_execution_gui 는 **dev-behavior-tree 의 변경에 의존**하지만, dev-behavior-tree 는 bt_execution_gui 에 의존하지 않습니다 (단방향).
 

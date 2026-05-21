@@ -36,10 +36,28 @@ Layer 4: Payload Validator    (사용자 입력 → manifest 기반 검증)
 
 ### 2.1 위치
 
-**`dev-behavior-tree/w_behavior_tree/w_behavior_tree/behavior_trees/<TreeName>.meta.yaml`** (각 트리 옆 sidecar)
+**`bt_execution_gui/bt_web_bridge/manifests/<TreeName>.meta.yaml`** (운영 GUI 자체 자산)
 
-근거 (사용자 결정 2026-05-21):
-> "각 트리별 메타 데이터를 나누는 방식인 B가 좋아보여. 어차피 다른 repo 로 분리되는 구조다 보니까 파일 수가 증가되어도 괜찮아보여."
+install 후 `share/bt_web_bridge/manifests/` 로 ament 배포. `bt_web_bridge --manifest-dir`
+의 default 는 ament_index_python 으로 share 디렉토리 lookup. env var
+`BT_WEB_BRIDGE_MANIFEST_DIR` 또는 launch arg `manifest_dir` 로 override 가능.
+
+근거 (사용자 결정 2026-05-21 reconsidered):
+- 1차 결정 (2026-05-21 초): 각 트리 옆 sidecar (`w_behavior_tree/behavior_trees/`) —
+  drift 안전 + 단방향 의존 우선.
+- 2차 결정 (2026-05-21 후): bt_execution_gui 자체 자산 (`bt_web_bridge/manifests/`) —
+  운영 자체 완결 + 운영자 단독 수정 가능 우선. dev-behavior-tree (BT 작성자) 와
+  bt_execution_gui (운영자) 권한 명확 분리.
+
+trade-off 박제:
+| 측면 | dev-behavior-tree 측 (구) | bt_execution_gui 측 (현) |
+|---|---|---|
+| Drift 검증 | XML 옆 → 같은 PR 동시 수정 강제 | bt_web_bridge startup self-check 가 schema ↔ manifest 양방향 drift 검증 (Layer 3 보강) |
+| 권한 | BT 작성자 = manifest 작성자 | 운영자 = manifest 작성자 |
+| 단방향 의존 | dev-behavior-tree → BT SSOT | bt_execution_gui 가 dev-behavior-tree XML 만 read |
+| 자체 완결 | bt_execution_gui 가 manifest 외부 의존 | bt_execution_gui 자체 완결 |
+| 운영자 수정 | dev-behavior-tree PR 필요 | bt_execution_gui PR 만 |
+| 다른 클라이언트 | sidecar 공유 가능 | bt_execution_gui 전유 |
 
 ### 2.2 스펙
 

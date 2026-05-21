@@ -1,0 +1,63 @@
+# bt_execution_gui Layer 1 — DockTree sidecar manifest
+# SSOT: bt_execution_gui/docs/02_schema_extraction.md §2
+# 대응 트리: behavior_trees/DockTree.xml
+tree_id: DockTree
+display_name: "도킹 (이동 + 정렬)"
+description: |
+  Nav 이동 후 도킹 통합 시나리오. MoveTree 로 staging pose 까지 이동 후
+  DockRobotAction 으로 정밀 정렬. 회복/재시도 없음 — 실패 시 즉시 FAILURE.
+  성공 조건: Move SUCCESS AND Dock SUCCESS (dock_error_code == 0)
+category: single
+dangerous: true
+estimated_duration_sec: 60
+params:
+  - key: dock_id
+    type: string
+    required: true
+    description: |
+      도킹 스테이션 ID. w_robot_docking 의 config/default_params.yaml 의
+      dock_ids 리스트에 등록된 값만 허용 (예: "forward_dock", "backward_dock",
+      선택적으로 "static_front_dock", "static_rear_dock"). 그 외 값은 도킹
+      서버가 UNKNOWN_DOCK_ID(1) 반환.
+  - key: goal_pose
+    type: PoseStamped
+    required: true
+    description: "Staging pose — DockRobotAction 이전의 정렬 진입 위치."
+  - key: timeout_ms
+    type: int
+    required: false
+    default: 30000
+    range: [1000.0, 600000.0]
+    description: "MoveTree (NavSingleAction) 네비게이션 타임아웃 (ms)."
+  - key: replan_period_ms
+    type: int
+    required: false
+    default: 1000
+    range: [100.0, 60000.0]
+    description: "MoveTree 경로 재계획 주기 (ms)."
+  - key: goal_checker_name
+    type: string
+    required: false
+    default: ""
+    description: "MoveTree NavSingle 의 goal_checker plugin 이름. 빈 string = navigator default."
+  - key: progress_checker_name
+    type: string
+    required: false
+    default: ""
+    description: "MoveTree NavSingle 의 progress_checker plugin 이름. 빈 string = navigator default."
+  - key: pass_final_goal_tol
+    type: double
+    required: false
+    default: 0.0
+    range: [0.0, 1.0]
+    note: |
+      Dock STAGING_TOL 미만 권장 (B-30). 도킹 트리는 정확 정렬이 필요하므로
+      0.0 (비활성) 또는 STAGING_TOL 보다 작은 값을 강력 권장. 너무 크면 staging
+      도달 판정과 DockRobotAction 시작 사이 mismatch 로 DETECTION/STAGING_TIMEOUT 위험.
+    description: "MoveTree pass_final_goal 모드 임계값 (m). >0 활성, <=0 비활성."
+  - key: recovery_mode
+    type: string
+    required: false
+    default: ""
+    enum: ["", "stop_and_go", "avoidance"]
+    description: "Nav 회복 모드. 빈 string = navigator 자동 결정."

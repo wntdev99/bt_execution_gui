@@ -1,0 +1,94 @@
+# bt_execution_gui Layer 1 — ElevatorAlightingTree sidecar manifest
+# SSOT: bt_execution_gui/docs/02_schema_extraction.md §2
+# 대응 트리: behavior_trees/ElevatorAlightingTree.xml
+# SubTree 의존: MoveTree, DoorStateMonitorSubtree (mode="realtime" literal),
+#                ElevatorFloorChangedSubtree (placeholder), ElevatorOccupancyDetectSubtree (placeholder)
+# Note: DoorStateMonitor 의 mode 는 literal binding ("realtime") — payload 입력 불필요.
+#       (bt_schema_server tree_xml_parser/schema_builder fix 이후 schema 도 mode 를 제외.)
+tree_id: ElevatorAlightingTree
+display_name: "엘리베이터 하차"
+description: |
+  엘리베이터 하차 시나리오 (Step 0 사전 조건 wait → Step 1 alias 후진 →
+  Step 2 무한 retry 진출 with AbortGuard + LatchTry + 완료 판정) +
+  외곽 Timeout 60s + PromotionCheck (외곽 만료 후 door 미걸침 + inside 벗어남
+  충족 시 SUCCESS 승격) + finally (default alias 복원 + path 추종 cancel).
+  point_of_no_return latch — inside 일부 벗어남 또는 door zone 걸침 시 set 후
+  AbortGuard skip → 시도 강행. DoorStateMonitor 가 realtime 모드로 양방향 평가.
+category: single
+dangerous: true
+estimated_duration_sec: 60
+params:
+  # ── UpdateParam alias (param_config 는 공유) ───────────────────────────────
+  - key: param_config
+    type: string
+    required: true
+    description: "UpdateParam config 파일 경로 (param_sets.yaml)."
+  - key: reverse_param_alias
+    type: string
+    required: true
+    description: 'Step 1 alias (예: "elevator_reverse"). 후진 movement 용.'
+  - key: default_param_alias
+    type: string
+    required: true
+    description: 'Finally 복원 alias (예: "default").'
+  # ── EV pose / zone id ─────────────────────────────────────────────────────
+  - key: elevator_outside_pose
+    type: PoseStamped
+    required: true
+    description: "하차 목표 (EV 앞). MoveTree(outside_pose) + DoorStateMonitor 경로 계산 대상."
+  - key: elevator_inside_zone_id
+    type: string
+    required: true
+    description: "EV 내부 zone id (inside 벗어남 판정용)."
+  - key: elevator_door_zone_id
+    type: string
+    required: true
+    description: "문 영역 zone id (미걸침 판정용)."
+  # ── 임계값 ─────────────────────────────────────────────────────────────────
+  - key: final_distance_tol
+    type: double
+    required: false
+    default: 0.05
+    range: [0.0, 1.0]
+    description: "MoveTree pass_final_goal_tol (m). 정확 도달 임계값."
+  - key: door_zone_clear_max_occupancy
+    type: int
+    required: false
+    default: 30
+    range: [0.0, 100.0]
+    description: "문 미걸침 판정 임계값 (점유 % 미만이면 미걸침)."
+  - key: inside_zone_exit_max_occupancy
+    type: int
+    required: false
+    default: 30
+    range: [0.0, 100.0]
+    description: "inside 벗어남 판정 임계값 (점유 % 미만이면 벗어남)."
+  # ── MoveTree 잔여 autoremap 키 ─────────────────────────────────────────────
+  - key: timeout_ms
+    type: int
+    required: false
+    default: 30000
+    range: [1000.0, 600000.0]
+    description: "MoveTree 네비게이션 타임아웃 (ms)."
+  - key: replan_period_ms
+    type: int
+    required: false
+    default: 1000
+    range: [100.0, 60000.0]
+    description: "MoveTree 경로 재계획 주기 (ms)."
+  - key: goal_checker_name
+    type: string
+    required: false
+    default: ""
+    description: "MoveTree NavSingle goal_checker plugin. 빈 string = navigator default."
+  - key: progress_checker_name
+    type: string
+    required: false
+    default: ""
+    description: "MoveTree NavSingle progress_checker plugin. 빈 string = navigator default."
+  - key: recovery_mode
+    type: string
+    required: false
+    default: ""
+    enum: ["", "stop_and_go", "avoidance"]
+    description: "MoveTree 회복 모드. 빈 string = navigator 자동 결정."

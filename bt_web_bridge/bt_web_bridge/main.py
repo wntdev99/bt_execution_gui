@@ -236,16 +236,31 @@ async def _amain(args: argparse.Namespace) -> int:
             rclpy.shutdown()
 
 
+def _default_manifest_dir() -> str:
+    """Resolve sidecar manifest directory.
+
+    Priority: BT_WEB_BRIDGE_MANIFEST_DIR env var → installed share/manifests/
+    (bundled with the package via setup.py). Empty string if ament_index lookup
+    fails (e.g. uninstalled source-only runs) — argparse 가 명시 인자 강제.
+    """
+    env = os.environ.get('BT_WEB_BRIDGE_MANIFEST_DIR')
+    if env:
+        return env
+    try:
+        from ament_index_python.packages import get_package_share_directory
+        share = get_package_share_directory('bt_web_bridge')
+    except Exception:
+        return ''
+    return os.path.join(share, 'manifests')
+
+
 def _build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog='bt_web_bridge')
     p.add_argument(
         '--manifest-dir',
-        default=os.environ.get(
-            'BT_WEB_BRIDGE_MANIFEST_DIR',
-            '/home/jeongmin/Package/ros2/dev-behavior-tree/w_behavior_tree/'
-            'w_behavior_tree/behavior_trees',
-        ),
-        help='Sidecar manifest directory (root of *.meta.yaml search).',
+        default=_default_manifest_dir(),
+        help='Sidecar manifest directory (root of *.meta.yaml search). '
+             'Defaults to installed share/bt_web_bridge/manifests/.',
     )
     p.add_argument('--host', default='0.0.0.0')
     p.add_argument('--port', type=int, default=8000)

@@ -1,0 +1,70 @@
+# bt_execution_gui Layer 1 — NavSingleZoneAware sidecar manifest
+# SSOT: bt_execution_gui/docs/02_schema_extraction.md §2
+# 대응 트리: behavior_trees/NavSingleZoneAware.xml
+# SubTree 의존: MoveTree, ZoneAwareParamManager (B-10 — 외부 BB key verbatim 복사)
+tree_id: NavSingleZoneAware
+display_name: "단순 이동 + Zone 인식 파라미터"
+description: |
+  Nav 이동 본체 + Zone 점유 변화에 따른 controller 파라미터 자동 전환.
+  종료 시 default alias 복원 보장 (Sequence finally 패턴, B-24 옵션 B).
+  성공/실패 모두 default 복원 후 main_succeeded 로 최종 판정.
+category: single
+dangerous: false
+estimated_duration_sec: 30
+params:
+  # ── ZoneAwareParamManager 외부 BB key (verbatim, B-10 회피) ────────────────
+  - key: param_config
+    type: string
+    required: true
+    description: "UpdateParam config 파일 경로 (param_sets.yaml)."
+  - key: zone_group
+    type: string
+    required: true
+    description: 'ZoneOccupiedCondition group_id (예: "narrow_door").'
+  - key: zone_param_alias
+    type: string
+    required: true
+    description: 'Zone 진입 시 적용할 alias (예: "narrow_aisle").'
+  - key: default_param_alias
+    type: string
+    required: true
+    description: 'Zone 이탈 / 종료 시 복원 alias (예: "default").'
+  # ── MoveTree (NavSingleAction) 외부 BB key ─────────────────────────────────
+  - key: goal_pose
+    type: PoseStamped
+    required: true
+    description: "목적 위치."
+  - key: timeout_ms
+    type: int
+    required: false
+    default: 30000
+    range: [1000.0, 600000.0]
+    description: "네비게이션 타임아웃 (ms)."
+  - key: replan_period_ms
+    type: int
+    required: false
+    default: 1000
+    range: [100.0, 60000.0]
+    description: "경로 재계획 주기 (ms)."
+  - key: goal_checker_name
+    type: string
+    required: false
+    default: ""
+    description: "Nav goal_checker plugin 이름. 빈 string = navigator default."
+  - key: progress_checker_name
+    type: string
+    required: false
+    default: ""
+    description: "Nav progress_checker plugin 이름. 빈 string = navigator default."
+  - key: pass_final_goal_tol
+    type: double
+    required: false
+    default: 0.0
+    range: [0.0, 5.0]
+    description: "통과 판정 임계값 (m). >0 활성, <=0 비활성."
+  - key: recovery_mode
+    type: string
+    required: false
+    default: ""
+    enum: ["", "stop_and_go", "avoidance"]
+    description: "Nav 회복 모드. 빈 string = navigator 자동 결정."

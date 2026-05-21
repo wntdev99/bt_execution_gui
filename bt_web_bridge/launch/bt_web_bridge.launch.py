@@ -24,14 +24,13 @@ from launch.substitutions import LaunchConfiguration
 def generate_launch_description():
     pkg_share = get_package_share_directory('bt_web_bridge')
     default_config = os.path.join(pkg_share, 'config', 'bt_web_bridge.yaml')
+    default_manifest_dir = os.path.join(pkg_share, 'manifests')
 
     manifest_dir_arg = DeclareLaunchArgument(
         'manifest_dir',
-        default_value=(
-            '/home/jeongmin/Package/ros2/dev-behavior-tree/w_behavior_tree/'
-            'w_behavior_tree/behavior_trees'
-        ),
-        description='Directory containing *.meta.yaml sidecar manifests.',
+        default_value=default_manifest_dir,
+        description='Directory containing *.meta.yaml sidecar manifests. '
+                    'Defaults to bundled share/bt_web_bridge/manifests/.',
     )
     host_arg = DeclareLaunchArgument(
         'host', default_value='0.0.0.0',

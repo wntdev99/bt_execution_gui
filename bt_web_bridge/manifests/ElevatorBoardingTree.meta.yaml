@@ -1,0 +1,116 @@
+# bt_execution_gui Layer 1 — ElevatorBoardingTree sidecar manifest
+# SSOT: bt_execution_gui/docs/02_schema_extraction.md §2
+# 대응 트리: behavior_trees/ElevatorBoardingTree.xml
+# SubTree 의존: MoveTree, ZoneAwareParamManager
+# (DoorOpenDetect/ElevatorRequest/ElevatorInsideOccupancyDetect 는 inline placeholder)
+tree_id: ElevatorBoardingTree
+display_name: "엘리베이터 탑승"
+description: |
+  엘리베이터 탑승 5단계 (EV 앞 도착 → 호출/버튼 트리거 → 문 열림 보장 →
+  내부 진입 + 점유 감지 병렬 → 완료 판정) + FailSafe (후진 후 retry) +
+  외곽 Timeout 300s + PromotionCheck (zone 100% + door 미걸침 시 SUCCESS 승격).
+  Zone 인식 파라미터 자동 전환 + finally 의 default alias 복원 + path 추종 cancel.
+  Step 4+5 의 best-effort precise reach + AND fallback (B-30/B-31).
+category: single
+dangerous: true
+estimated_duration_sec: 300
+params:
+  # ── ZoneAwareParamManager 외부 BB key ──────────────────────────────────────
+  - key: param_config
+    type: string
+    required: true
+    description: "UpdateParam config 파일 경로 (param_sets.yaml)."
+  - key: zone_group
+    type: string
+    required: true
+    description: 'ZoneAware 모니터링 zone group id (예: "ev_group").'
+  - key: zone_param_alias
+    type: string
+    required: true
+    description: 'Zone 진입 시 alias (예: "elevator_boarding").'
+  - key: default_param_alias
+    type: string
+    required: true
+    description: '복원 alias (예: "default"). Finally 가 복원.'
+  - key: reverse_param_alias
+    type: string
+    required: true
+    description: '후진 fail-safe alias (예: "elevator_reverse"). FailSafe_BackOut 가 적용.'
+  # ── EV pose / zone id ─────────────────────────────────────────────────────
+  - key: elevator_approach_pose
+    type: PoseStamped
+    required: true
+    description: "EV 앞 대기 포즈 (Step 1 목적지)."
+  - key: elevator_inside_pose
+    type: PoseStamped
+    required: true
+    description: "EV 내부 목표 포즈 (Step 4 목적지 + 문 열림 감지의 ComputePathToPose 대상)."
+  - key: elevator_backout_pose
+    type: PoseStamped
+    required: true
+    description: "후진 fail-safe 목표 (FailSafe_BackOut)."
+  - key: elevator_inside_zone_id
+    type: string
+    required: true
+    description: "내부 zone id (footprint 100% 점유 시 진입 완료 판정)."
+  - key: elevator_door_zone_id
+    type: string
+    required: true
+    description: "문 영역 zone id (미걸침 판정용 — door_zone_clear_max_occupancy 미만)."
+  # ── 임계값 ─────────────────────────────────────────────────────────────────
+  - key: final_distance_tol
+    type: double
+    required: false
+    default: 0.05
+    range: [0.0, 1.0]
+    note: |
+      1차 PreciseAND 의 정확 도달 판정 + MoveTree.pass_final_goal_tol. 작은 값 권장 (5cm).
+      너무 크면 (예: 0.5) MoveTree 가 inside_pose 멀리서 일찍 SUCCESS → 1차 진입 시
+      robot 이 inside_pose 와 멀리 떨어짐 — 사용자 의도 "정확 도달 가능하면 도달" 위반.
+      정확 도달 불가능 시 2차 fallback (AND 만) 으로 통과 가능.
+    description: "정확 도달 (precise reach) 임계값 (m)."
+  - key: door_zone_clear_max_occupancy
+    type: int
+    required: false
+    default: 30
+    range: [0.0, 100.0]
+    description: "문 zone 미걸침 판정 임계값 (점유 % 미만이면 미걸침)."
+  # ── MoveTree 잔여 autoremap 키 ─────────────────────────────────────────────
+  - key: timeout_ms
+    type: int
+    required: false
+    default: 30000
+    range: [1000.0, 600000.0]
+    description: "MoveTree 네비게이션 타임아웃 (ms)."
+  - key: replan_period_ms
+    type: int
+    required: false
+    default: 1000
+    range: [100.0, 60000.0]
+    description: "MoveTree 경로 재계획 주기 (ms)."
+  - key: goal_checker_name
+    type: string
+    required: false
+    default: ""
+    description: "MoveTree NavSingle goal_checker plugin. 빈 string = navigator default."
+  - key: progress_checker_name
+    type: string
+    required: false
+    default: ""
+    description: "MoveTree NavSingle progress_checker plugin. 빈 string = navigator default."
+  - key: pass_final_goal_tol
+    type: double
+    required: false
+    default: 0.0
+    range: [0.0, 1.0]
+    note: |
+      Step 1/FailSafe 의 MoveTree 호출은 explicit 매핑이 없어 autoremap 으로 부모 키 사용.
+      Step 4 의 MoveTree(inside_pose) 만 final_distance_tol 로 explicit 매핑됨.
+      Step 1 (approach) / FailSafe (backout) 의 통과 판정 임계값 (m).
+    description: "Step 1 / FailSafe MoveTree 의 pass_final_goal_tol."
+  - key: recovery_mode
+    type: string
+    required: false
+    default: ""
+    enum: ["", "stop_and_go", "avoidance"]
+    description: "MoveTree 회복 모드. 빈 string = navigator 자동 결정."

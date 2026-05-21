@@ -28,9 +28,14 @@ a0ca43e feat(bt_schema_server): Layer 2 schema extraction C++ node
 46b1a88 docs: add v1 system design (4-Layer Defense + scenario engine)
 ```
 
-**dev-behavior-tree 측 동시 작업** (sidecar 6 작성 conversation, 2026-05-21):
-- `w_behavior_tree` (refactor/split-interfaces) 51f19ab: behavior_trees/*.meta.yaml × 6
+**dev-behavior-tree 측 동시 작업** (sidecar 6 작성 + 이동 conversation, 2026-05-21):
+- `w_behavior_tree` (refactor/split-interfaces) 51f19ab: behavior_trees/*.meta.yaml × 6 (이후 본 conversation 에서 삭제)
 - `develop_bt` (main) fe76e5a: guide/04 §6 (root tree + sidecar 패턴) + guide/07 §1.4 (.meta.yaml + exposed_tree_ids 임팩트)
+
+**sidecar 위치 재결정** (2026-05-21 후반): bt_execution_gui/bt_web_bridge/manifests/
+로 이동. 사유: 운영 자체 완결 + 운영자 단독 수정. drift 안전성은 Layer 3 self-check
+가 보장. docs/02 §2.1 의 trade-off 박제 + dev-behavior-tree 측 sidecar 삭제 commit
++ develop_bt guide 갱신.
 
 완료:
 - 백엔드 풀스택 (Phase A + B + C1 + C2 + C3)

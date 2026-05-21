@@ -1,0 +1,21 @@
+# bt_execution_gui Layer 1 — UndockTree sidecar manifest
+# SSOT: bt_execution_gui/docs/02_schema_extraction.md §2
+# 대응 트리: behavior_trees/UndockTree.xml
+tree_id: UndockTree
+display_name: "언도킹"
+description: |
+  단일 언도킹 시나리오. UndockRobotAction wrapper — 이동 분기 없음.
+  회복/재시도 없음 (사용자 결정: Undock only). 실패 시 즉시 FAILURE.
+  성공 조건: Undock SUCCESS (undock_error_code == 0)
+category: single
+dangerous: true
+estimated_duration_sec: 10
+params:
+  - key: dock_id
+    type: string
+    required: true
+    description: |
+      언도킹 대상 도킹 스테이션 ID. w_robot_docking 의
+      config/default_params.yaml 의 dock_ids 리스트에 등록된 값만 허용
+      (예: "forward_dock", "backward_dock", 선택적으로 "static_front_dock",
+      "static_rear_dock"). 그 외 값은 UNKNOWN_DOCK_ID(1) 반환.
