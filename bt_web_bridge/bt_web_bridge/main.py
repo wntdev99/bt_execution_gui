@@ -33,12 +33,18 @@ import sys
 import threading
 from pathlib import Path
 
+from bt_web_bridge.api.execute import router as execute_router
+from bt_web_bridge.api.execute import trees_validate_router
 from bt_web_bridge.api.status import router as status_router
 from bt_web_bridge.api.trees import router as trees_router
+from bt_web_bridge.api.ws import router as ws_router
+from bt_web_bridge.lock_manager import LockManager
 from bt_web_bridge.manifest_loader import ManifestLoader, ManifestLoadError
 from bt_web_bridge.models import SelfCheckError
+from bt_web_bridge.payload_validator import PayloadValidator
 from bt_web_bridge.ros_bridge import RosBridge
 from bt_web_bridge.self_check import run_self_check
+from bt_web_bridge.ws_manager import WsManager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import rclpy
@@ -48,7 +54,13 @@ from rclpy.executors import SingleThreadedExecutor
 logger = logging.getLogger('bt_web_bridge.main')
 
 
-def build_app(bridge: RosBridge, manifests: ManifestLoader) -> FastAPI:
+def build_app(
+    bridge: RosBridge,
+    manifests: ManifestLoader,
+    lock_manager: LockManager,
+    ws_manager: WsManager,
+    validator: PayloadValidator,
+) -> FastAPI:
     """Build the FastAPI app with CORS + routers + shared state."""
     app = FastAPI(
         title='bt_web_bridge',
@@ -69,12 +81,18 @@ def build_app(bridge: RosBridge, manifests: ManifestLoader) -> FastAPI:
 
     app.state.bridge = bridge
     app.state.manifests = manifests
-    app.state.active_execution = None
+    app.state.lock_manager = lock_manager
+    app.state.ws_manager = ws_manager
+    app.state.validator = validator
+    app.state.background_tasks = set()
     app.state.self_check_passed_at = None
     app.state.scenario_count = 0
 
     app.include_router(status_router)
     app.include_router(trees_router)
+    app.include_router(execute_router)
+    app.include_router(trees_validate_router)
+    app.include_router(ws_router)
 
     @app.get('/')
     async def root() -> dict:
@@ -147,11 +165,16 @@ async def _amain(args: argparse.Namespace) -> int:
             )
 
         # ── FastAPI app ──
-        app = build_app(bridge, manifests)
+        lock_manager = LockManager()
+        ws_manager = WsManager()
+        ws_manager.bind_loop(asyncio.get_running_loop())
+        validator = PayloadValidator(manifests)
+
+        app = build_app(bridge, manifests, lock_manager, ws_manager, validator)
         app.state.self_check_passed_at = ts
 
         # ── uvicorn ──
-        import uvicorn  # noqa: I900 — runtime dep, fail-fast if missing
+        import uvicorn   # noqa: I900 — runtime dep, fail-fast if missing
         config = uvicorn.Config(
             app, host=args.host, port=args.port,
             log_level=args.log_level.lower(),

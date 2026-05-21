@@ -3,9 +3,12 @@
 FastAPI ↔ ROS2 bridge — Layer 3 (startup self-check) + Layer 4 (payload validator)
 + scenario engine + HTTP REST + WebSocket. ament_python 패키지.
 
-> 본 패키지는 C1, C2, C3 세 sub-phase 로 분할 구현. **현재 C1 완료**:
-> manifest_loader / ros_bridge / self_check / `/api/status` / `/api/trees`.
-> C2 (단일 실행 + WebSocket), C3 (시나리오 엔진) 은 후속 commit.
+> 본 패키지는 C1, C2, C3 세 sub-phase 로 분할 구현.
+>
+> **C1 완료**: manifest_loader / ros_bridge / self_check / `/api/status` / `/api/trees`.
+> **C2 완료**: lock_manager / payload_validator / emergency / ws_manager / execution_runner / `/api/execute` / `/api/execute/cancel` / `/api/emergency-stop` / `/api/trees/{id}/validate` / WebSocket `/api/ws`.
+>
+> C3 (시나리오 엔진 + history + scenario endpoints) 후속.
 
 ---
 
@@ -98,7 +101,9 @@ bt_web_bridge --manifest-dir ... --skip-self-check  # ★ 운영 시 금지
 
 ---
 
-## 5. C1 endpoints (구현 완료)
+## 5. Endpoints (C1 + C2 구현 완료)
+
+### HTTP REST
 
 | Method | Path | 설명 |
 |---|---|---|
@@ -107,8 +112,18 @@ bt_web_bridge --manifest-dir ... --skip-self-check  # ★ 운영 시 금지
 | GET | `/api/status` | 헬스 + active execution snapshot |
 | GET | `/api/trees` | manifest 기반 트리 목록 (단일 실행 카드용) |
 | GET | `/api/trees/{tree_id}` | 트리 상세 + params 명세 |
+| POST | `/api/trees/{tree_id}/validate` | dry-validate payload (UI 인라인 검증) |
+| POST | `/api/execute` | 단일 BT 실행 — Lock + send_goal + background task |
+| POST | `/api/execute/cancel` | 현재 실행 cancel 요청 |
+| POST | `/api/emergency-stop` | 전역 E-STOP — active goal cancel + WS broadcast |
 
-C2/C3 endpoints 는 후속 commit.
+### WebSocket (one-way, server → client)
+
+| Path | Event types |
+|---|---|
+| `/api/ws` | `welcome` / `execution_started` / `execution_feedback` / `execution_finished` / `emergency_stopped` / `error` |
+
+C3 endpoints (시나리오 CRUD + 실행 모니터) 는 후속 commit.
 
 ---
 
@@ -179,8 +194,7 @@ colcon test-result --verbose
 
 ## 9. 다음 단계
 
-- **C2**: lock_manager + emergency + payload_validator + `/api/execute` + WebSocket
-- **C3**: scenario_engine + storage + history_db + `/api/scenarios/*`
+- **C3**: scenario_engine + storage + history_db + `/api/scenarios/*` + 모든 시나리오 WS 이벤트
 
 ---
 

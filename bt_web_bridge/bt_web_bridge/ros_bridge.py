@@ -27,11 +27,10 @@ from __future__ import annotations
 import asyncio
 import logging
 from concurrent.futures import Future as ConcurrentFuture
-from typing import Any
+from typing import Any, Callable
 
-import rclpy
-from rclpy.node import Node
 from rclpy.action import ActionClient
+from rclpy.node import Node
 from rclpy.task import Future as RosFuture
 
 from bt_schema_server_interfaces.srv import GetNodesModel, GetTreeSchema, ListTrees
@@ -121,6 +120,76 @@ class RosBridge(Node):
         req = GetNodesModel.Request()
         req.include_builtin = include_builtin
         return await _await_ros_future(self.get_nodes_model_client.call_async(req))
+
+    # ──────────────────────────── ExecuteTree action ────────────────────────
+
+    async def send_execute_tree(
+        self,
+        tree_id: str,
+        payload_json: str,
+        feedback_cb: Callable[[str], None] | None = None,
+        on_goal_accepted: Callable[[Any], None] | None = None,
+        cancel_event: asyncio.Event | None = None,
+        wait_for_server_timeout: float = 10.0,
+    ) -> ExecuteTree.Result:
+        """Send a goal and await result.
+
+        - `feedback_cb` is called with each `feedback.message` (string).
+        - `on_goal_accepted` is invoked once with the rclpy ClientGoalHandle
+          (so the caller can stash it for cancel/E-STOP).
+        - `cancel_event`, if set during execution, triggers cancel_goal_async.
+        - Raises RuntimeError if the goal is rejected or the action server is
+          unreachable.
+        """
+        if not self.execute_tree_client.wait_for_server(
+            timeout_sec=wait_for_server_timeout,
+        ):
+            raise TimeoutError(
+                f"action server not available within {wait_for_server_timeout}s: "
+                f"{self.execution_action_name}"
+            )
+
+        goal = ExecuteTree.Goal()
+        goal.target_tree = tree_id
+        goal.payload = payload_json
+
+        def _fb(msg: Any) -> None:
+            if feedback_cb is None:
+                return
+            try:
+                feedback_cb(msg.feedback.message)
+            except Exception as e:   # pragma: no cover
+                logger.warning('feedback_cb raised: %s', e)
+
+        send_fut = self.execute_tree_client.send_goal_async(
+            goal, feedback_callback=_fb,
+        )
+        goal_handle = await await_concurrent(send_fut)
+        if not goal_handle.accepted:
+            raise RuntimeError(f'goal rejected: target_tree={tree_id}')
+
+        if on_goal_accepted is not None:
+            on_goal_accepted(goal_handle)
+
+        result_fut = goal_handle.get_result_async()
+
+        # Poll loop — also watch cancel_event.
+        cancel_sent = False
+        while not result_fut.done():
+            if cancel_event is not None and cancel_event.is_set() and not cancel_sent:
+                cancel_sent = True
+                logger.info('send_execute_tree: cancel requested')
+                try:
+                    cancel_fut = goal_handle.cancel_goal_async()
+                    await await_concurrent(cancel_fut, poll_interval=0.05)
+                except Exception as e:
+                    logger.warning('cancel_goal_async failed: %s', e)
+                # Continue waiting for the result (action server still emits
+                # canceled/aborted result).
+            await asyncio.sleep(0.05)
+
+        wrapped = result_fut.result()
+        return wrapped.result   # ExecuteTree.Result
 
 
 # ════════════════════════════ rclpy.task.Future -> asyncio bridge ═════════════════
