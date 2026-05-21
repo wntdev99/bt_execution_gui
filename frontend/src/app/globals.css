@@ -1,0 +1,117 @@
+/*
+ * bt_execution_gui — global styles
+ * Toss 풍 + 운영 콘솔 디자인 토큰.
+ */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
+@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --surface-elev: #f5f5f7;
+  --border: rgba(0, 0, 0, 0.06);
+  --border-strong: rgba(0, 0, 0, 0.1);
+
+  --text: #0a0a0a;
+  --text-sub: rgba(0, 0, 0, 0.55);
+  --text-mute: rgba(0, 0, 0, 0.35);
+
+  --accent: #3182f6;
+  --accent-hover: #1b64da;
+  --accent-soft: #e8f1ff;
+
+  --danger: #f04452;
+  --danger-hover: #d62e3a;
+  --danger-soft: rgba(240, 68, 82, 0.08);
+  --danger-ring: rgba(240, 68, 82, 0.18);
+
+  --warning: #ff8a00;
+  --warning-soft: rgba(255, 138, 0, 0.08);
+
+  --success: #00bf6f;
+  --success-soft: rgba(0, 191, 111, 0.08);
+
+  --running: #3182f6;
+
+  /* Subtle grain texture for atmospheric depth */
+  --grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='1' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.025 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body {
+  font-family: 'Pretendard Variable', Pretendard, system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'ss03', 'ss04', 'cv01', 'cv02';
+}
+
+body::before {
+  /* Layer subtle grain for atmospheric depth (skill guidance) */
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: var(--grain);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 0;
+  mix-blend-mode: multiply;
+}
+
+/* Numeric tabular for monospace digits (BB key values, ETA, timestamps) */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Pulse ring overlay (used by StatusPulse) */
+.pulse-ring::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0.18;
+  animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  pointer-events: none;
+}
+
+/* Focus ring — accent for inputs/buttons */
+:where(button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Scrollbar — minimal */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.22);
+}
+
+/* Decorative diagonal hatch — used in dangerous flag accent */
+.hatch-warning {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--warning) 0,
+    var(--warning) 2px,
+    transparent 2px,
+    transparent 6px
+  );
+}

@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+.env*.local
+*.log
+.DS_Store
+
+# build artifacts
+tsconfig.tsbuildinfo
+
+# generated (regen via `npm run gen-api-types` against running bt_web_bridge)
+src/api/types.gen.ts
