@@ -196,6 +196,74 @@ TEST(TreeXmlParser, SubTreeExplicitRemapTracked)
   EXPECT_TRUE(found);
 }
 
+TEST(TreeXmlParser, SubTreeLiteralAttributeTrackedAsRemap)
+{
+  // <SubTree mode="realtime"/> 같은 literal attribute 도 explicit_remaps 에
+  // 추가되어야 함. schema_builder 가 brace 검사로 BB vs literal 구분해서
+  // literal 의 경우 child external 키의 autoremap 전파를 차단할 수 있게 함.
+  // (ElevatorAlightingTree 의 DoorStateMonitor mode="realtime" 같은 case.)
+  TempDir td;
+  td.writeFile("P.xml",
+    R"(<?xml version="1.0"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="Parent">
+    <SubTree ID="Child" mode="realtime"
+             dest_pose="{goal_pose}" _autoremap="true"/>
+  </BehaviorTree>
+</root>
+)");
+  TreeXmlParser p;
+  p.scanDirectory(td.path());
+  auto bindings = p.extractBindings("Parent");
+  ASSERT_TRUE(bindings.has_value());
+  ASSERT_EQ(bindings->subtree_calls.size(), 1u);
+  auto & call = bindings->subtree_calls[0];
+  EXPECT_TRUE(call.autoremap);
+
+  // literal 도 추적됨 — value 는 brace 없는 원본
+  ASSERT_EQ(call.explicit_remaps.count("mode"), 1u);
+  EXPECT_EQ(call.explicit_remaps.at("mode"), "realtime");
+
+  // BB 매핑은 기존대로 brace 포함 저장
+  ASSERT_EQ(call.explicit_remaps.count("dest_pose"), 1u);
+  EXPECT_EQ(call.explicit_remaps.at("dest_pose"), "{goal_pose}");
+
+  // literal 은 parent bindings 에 추가되면 안 됨 (parent 에서 read 되는 키 아님)
+  for (auto & b : bindings->bindings) {
+    EXPECT_NE(b.bb_key, "realtime") << "literal 값이 BB key 로 잘못 추적됨";
+    EXPECT_NE(b.bb_key, "mode") << "child port name 이 parent BB key 로 잘못 추적됨";
+  }
+  // BB 매핑은 parent bindings 에 등록 (parent_key = goal_pose)
+  bool goal_pose_found = false;
+  for (auto & b : bindings->bindings) {
+    if (b.bb_key == "goal_pose") {
+      goal_pose_found = true;
+    }
+  }
+  EXPECT_TRUE(goal_pose_found);
+}
+
+TEST(TreeXmlParser, SubTreeEmptyAttributeIgnored)
+{
+  // 빈 attribute 는 explicit_remaps 에 추가 안 됨.
+  TempDir td;
+  td.writeFile("P.xml",
+    R"(<?xml version="1.0"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="Parent">
+    <SubTree ID="Child" mode="" _autoremap="true"/>
+  </BehaviorTree>
+</root>
+)");
+  TreeXmlParser p;
+  p.scanDirectory(td.path());
+  auto bindings = p.extractBindings("Parent");
+  ASSERT_TRUE(bindings.has_value());
+  ASSERT_EQ(bindings->subtree_calls.size(), 1u);
+  auto & call = bindings->subtree_calls[0];
+  EXPECT_EQ(call.explicit_remaps.count("mode"), 0u);
+}
+
 TEST(TreeXmlParser, AutoremapDetected)
 {
   TempDir td;

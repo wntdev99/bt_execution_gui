@@ -135,12 +135,20 @@ void walkElement(
           continue;
         }
 
-        // 그 외 attribute 는 explicit remap 후보
+        // 그 외 attribute 는 explicit remap 후보 — 두 가지 형태:
+        //   1) "{key}"  → parent BB key 매핑   (stripBraces 가 key 반환)
+        //   2) literal  → child port 에 literal 값 binding (parent BB 매핑 없음)
+        // 두 경우 모두 explicit_remaps 에 raw 저장 — schema_builder 가 brace 검사로
+        // BB vs literal 구분하여 child external 키의 부모 전파 여부 결정.
         auto key = stripBraces(attr_value);
         if (!key.empty()) {
           call.explicit_remaps[attr_name] = attr_value;
-          // 명시 매핑은 parent 에서 key 가 read 됨.
+          // 명시 BB 매핑은 parent 에서 key 가 read 됨.
           out.bindings.push_back({key, node_type, node_uid, attr_name, false});
+        } else if (!attr_value.empty()) {
+          // literal binding — schema_builder 가 autoremap 전파를 차단하기 위한 마커.
+          // bindings 에는 추가 안 함 (parent 에서 read 되는 BB 가 아님).
+          call.explicit_remaps[attr_name] = attr_value;
         }
       }
 

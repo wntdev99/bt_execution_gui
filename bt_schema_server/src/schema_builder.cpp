@@ -125,8 +125,21 @@ std::optional<TreeSchema> SchemaBuilder::buildSchema(const std::string & tree_id
 
   // internal_keys 는 root tree 의 producers 만 표시 (재귀 SubTree 의 producers 는
   // 본 schema 의 관심 밖 — caller 가 알 필요 없음).
+  // OUTPUT/INOUT 포트의 binding 도 producer 효과 (collectExternalKeys 와 동일 규칙).
   auto root_bindings = parser_.extractBindings(tree_id);
   if (root_bindings) {
+    for (auto & b : root_bindings->bindings) {
+      if (b.is_script) {
+        continue;
+      }
+      auto dir = lookupPortDir(b.node_type, b.port_name);
+      if (dir == PortDir::Output || dir == PortDir::InOut) {
+        if (root_bindings->producers.count(b.bb_key) == 0) {
+          root_bindings->producers[b.bb_key] =
+            b.node_uid + "(" + b.port_name + ")";
+        }
+      }
+    }
     for (auto & [key, producer] : root_bindings->producers) {
       schema.internal_keys.push_back({key, producer});
     }
@@ -150,7 +163,11 @@ std::vector<ExternalKey> SchemaBuilder::collectExternalKeys(
   }
   auto & bindings = *bindings_opt;
 
-  // 1. 본 tree 의 모든 binding 을 key 별로 grouping
+  // 1. 본 tree 의 모든 binding 을 key 별로 grouping.
+  //    + OUTPUT/INOUT 포트로 매핑된 BB key 는 producer 효과 — 본 트리 안에서 write
+  //    되므로 external_keys 에서 제외. (예: UpdateParam 의 param_status="{param_status}",
+  //    DockRobotAction 의 dock_error_code="{dock_error_code}". 매번 set 되므로 외부
+  //    payload 입력 불필요.)
   std::map<std::string, std::vector<KeyConsumer>> consumer_map;
   std::set<std::string> all_keys_in_tree;
   for (auto & b : bindings.bindings) {
@@ -161,7 +178,15 @@ std::vector<ExternalKey> SchemaBuilder::collectExternalKeys(
     c.port_type = lookupPortType(b.node_type, b.port_name);
     c.direction = b.is_script ? PortDir::Input :
       lookupPortDir(b.node_type, b.port_name);
+    const PortDir port_dir = c.direction;
     consumer_map[b.bb_key].push_back(std::move(c));
+
+    if (port_dir == PortDir::Output || port_dir == PortDir::InOut) {
+      // 본 트리 안에서 write 되는 키 — producer 등록 (internal_keys 로 분류).
+      if (bindings.producers.count(b.bb_key) == 0) {
+        bindings.producers[b.bb_key] = b.node_uid + "(" + b.port_name + ")";
+      }
+    }
   }
 
   // 2. SubTree 호출 재귀 — 각 SubTree 의 external_keys 를 부모로 전파
@@ -175,17 +200,17 @@ std::vector<ExternalKey> SchemaBuilder::collectExternalKeys(
     // (parent_key 로 추가된 binding 의 node_type 은 "SubTree" — 포트 타입 조회 불가
     //  → child 의 external_keys 타입으로 fill-in)
     for (auto & ck : child_external) {
-      // 본 키가 명시 매핑되어 있으면 parent_key 로 변환
+      // 본 키가 명시 매핑되어 있으면 parent_key 로 변환 (또는 literal 차단)
       auto rem_it = call.explicit_remaps.find(ck.key);
       if (rem_it != call.explicit_remaps.end()) {
-        // explicit_remaps[child_port] = "{parent_key}"
-        std::string parent_key;
         const auto & raw = rem_it->second;
-        if (raw.size() >= 2 && raw.front() == '{' && raw.back() == '}') {
-          parent_key = raw.substr(1, raw.size() - 2);
-        } else {
-          parent_key = raw;
+        // BB binding 인지 확인 — "{parent_key}" 형식.
+        // literal binding (예: <SubTree mode="realtime"/>) 은 child port 에
+        // 고정값이 직접 들어가므로 parent BB 매핑이 없음 → 부모 전파 차단.
+        if (raw.size() < 2 || raw.front() != '{' || raw.back() != '}') {
+          continue;
         }
+        std::string parent_key = raw.substr(1, raw.size() - 2);
         all_keys_in_tree.insert(parent_key);
         for (auto & c : ck.consumers) {
           c.node_id = "SubTree:" + call.subtree_id + "::" + c.node_id;
