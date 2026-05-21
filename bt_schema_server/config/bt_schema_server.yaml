@@ -1,0 +1,45 @@
+# bt_schema_server 의 default config.
+#
+# 운영 시 dev-behavior-tree workspace 의 bt_execution_server.yaml 과
+# plugin_lib_names + bt_xml_dir 을 동일하게 유지해야 schema 추출이 정확.
+# (drift 시 Layer 3 startup self-check 가 잡지만 사전 일관 보장이 안전)
+#
+# 참고: dev-behavior-tree/w_behavior_tree/w_behavior_tree/config/bt_execution_server.yaml
+
+bt_schema_server:
+  ros__parameters:
+    # BT XML 디렉토리. 운영 시 절대 경로로 override (launch 인자 또는 yaml).
+    # 예: /home/jeongmin/Package/ros2/dev-behavior-tree/w_behavior_tree/w_behavior_tree/behavior_trees
+    bt_xml_dir: ""
+
+    plugin_lib_names:
+      # 본 list 는 bt_execution_server.yaml 과 동일하게 유지. CI 의 self-check 가
+      # plugin 미등록 시 GetTreeSchema 결과의 manifest 부재로 잡음.
+
+      # ── 커스텀 플러그인 (dev-behavior-tree 의 w_behavior_tree) ──
+      - w_retry_with_notify_bt_node
+      - w_publish_string_bt_node
+      - w_cancel_requested_bt_node
+      - w_update_param_node_bt_node
+      - w_call_set_bool_service_bt_node
+      - w_area_subscribe_action_bt_node
+      - w_check_area_condition_bt_node
+      - w_get_area_pose_service_bt_node
+      - w_request_door_open_service_bt_node
+      - w_nav_single_action_bt_node
+      - w_zone_occupied_condition_bt_node
+      - w_is_footprint_on_door_line_bt_node
+      - w_is_robot_on_inside_side_bt_node
+      - w_pass_final_goal_check_bt_node
+      - w_door_closed_debounce_condition_bt_node
+      - w_dock_robot_action_bt_node
+      - w_undock_robot_action_bt_node
+
+      # ── Nav2 BT 플러그인 ──
+      - nav2_compute_path_to_pose_action_bt_node
+      - nav2_follow_path_action_bt_node
+      - nav2_pipeline_sequence_bt_node
+      - nav2_rate_controller_bt_node
+      - nav2_controller_cancel_bt_node
+      - nav2_are_error_codes_active_condition_bt_node
+      - nav2_recovery_node_bt_node
