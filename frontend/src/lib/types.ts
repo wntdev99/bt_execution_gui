@@ -135,6 +135,44 @@ export interface ScenarioRunResponse {
   started_at: string | null;
 }
 
+/* ─────────────────────── History types ─────────────────────── */
+
+export interface HistoryListItem {
+  id: number;
+  started_at: string;
+  finished_at: string | null;
+  kind: 'single' | 'scenario';
+  tree_id: string | null;
+  scenario_id: string | null;
+  final_status: string | null;
+  result_message: string | null;
+}
+
+export interface HistoryStep {
+  id: number;
+  step_idx: number;
+  step_id: string;
+  kind: 'action' | 'wait';
+  tree_id: string | null;
+  payload: { params?: Record<string, unknown> } | Record<string, unknown>;
+  started_at: string;
+  finished_at: string | null;
+  status: string | null;
+  result_message: string | null;
+  feedback_messages: string[];
+}
+
+export interface HistoryDetail extends HistoryListItem {
+  payload: { params?: Record<string, unknown> } | Record<string, unknown>;
+  snapshot: Record<string, unknown>;
+  steps: HistoryStep[];
+}
+
+export interface HistoryListResponse {
+  total: number;
+  items: HistoryListItem[];
+}
+
 /* ─────────────────────── Execute / validate responses ─────────────────────── */
 
 export interface ExecuteResponse {

@@ -32,7 +32,7 @@ export function toPayloadValue(
 /**
  * Format timestamp (ISO or epoch ms) → "17:46:08".
  */
-export function formatTime(ts: string | number | undefined): string {
+export function formatTime(ts: string | number | null | undefined): string {
   if (!ts) return '—';
   const d = typeof ts === 'number' ? new Date(ts) : new Date(ts);
   if (Number.isNaN(d.getTime())) return '—';

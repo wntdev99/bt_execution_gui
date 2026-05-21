@@ -18,6 +18,8 @@ import type {
   ScenarioListItem,
   ScenarioRunResponse,
   ScenarioStep,
+  HistoryListResponse,
+  HistoryDetail,
 } from '@/lib/types';
 
 const API_BASE = '/api';
@@ -174,6 +176,27 @@ export const api = {
     },
     cancelRun(): Promise<{ execution_id: string; cancelling: boolean }> {
       return request('/scenarios/run/cancel', { method: 'POST' });
+    },
+  },
+
+  /* ── Execution history ── */
+  history: {
+    list(opts: {
+      limit?: number;
+      offset?: number;
+      kind?: 'single' | 'scenario';
+      scenario_id?: string;
+    } = {}): Promise<HistoryListResponse> {
+      const params = new URLSearchParams();
+      if (opts.limit != null) params.set('limit', String(opts.limit));
+      if (opts.offset != null) params.set('offset', String(opts.offset));
+      if (opts.kind) params.set('kind', opts.kind);
+      if (opts.scenario_id) params.set('scenario_id', opts.scenario_id);
+      const qs = params.toString();
+      return request(`/history${qs ? `?${qs}` : ''}`);
+    },
+    get(executionId: number): Promise<HistoryDetail> {
+      return request(`/history/${encodeURIComponent(String(executionId))}`);
     },
   },
 };
