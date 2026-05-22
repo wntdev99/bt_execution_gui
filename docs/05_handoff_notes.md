@@ -16,38 +16,65 @@
 
 ```
 git log --oneline (origin/main 기준):
-b1b0f68 feat(bt_schema_server): exposed_tree_ids ListTrees filter
-c4b8118 fix(bt_schema_server): SubTree literal binding + OUTPUT port producer
-80a3fda docs: add 05_handoff_notes — 구현 과정 함정 + 다음 agent 가이드
-adda62e feat(bt_web_bridge): C3 — scenario engine + storage + history + endpoints
-60644da feat(bt_web_bridge): C2 — single execution + lock + E-STOP + Validator + WebSocket
-4cba963 feat(bt_web_bridge): C1 — bridge skeleton + Layer 1/3 + /api/trees,status
+3252f27 feat(MoveTree): expose as operations root tree                    (2026-05-22)
+a366e12 feat(frontend): Phase D-3 history module                          (2026-05-21)
+c6626d9 feat(frontend): Phase D-2 scenarios module                        (2026-05-21)
+e70adf2 fix(frontend): align types with bt_web_bridge backend SSOT        (2026-05-21)
+4c27276 feat(docs): add environment setup guide for new users             (user)
+ddfb250 feat(frontend): Phase D-1 vertical slice                          (2026-05-21)
+9872e13 fix(bt_web_bridge): rename _RclpyThread._stop -> _stop_event      (2026-05-21)
+d0050b1 refactor(bt_web_bridge): relocate Layer 1 sidecar manifests       (2026-05-21)
+f08c217 docs(handoff): 박제 — schema_builder 3 함정 + sidecar 작업 결과   (2026-05-21)
+b1b0f68 feat(bt_schema_server): exposed_tree_ids ListTrees filter         (2026-05-21)
+c4b8118 fix(bt_schema_server): SubTree literal binding + OUTPUT producer  (2026-05-21)
+80a3fda docs: add 05_handoff_notes                                        (이전)
+adda62e feat(bt_web_bridge): C3 — scenario engine
+60644da feat(bt_web_bridge): C2 — single execution
+4cba963 feat(bt_web_bridge): C1 — bridge skeleton
 a0ca43e feat(bt_schema_server): Layer 2 schema extraction C++ node
 9d4587a feat(interfaces): add bt_schema_server_interfaces package
 0f1b6ce docs: relocate bt_schema_server packages into bt_execution_gui
 46b1a88 docs: add v1 system design (4-Layer Defense + scenario engine)
 ```
 
-**dev-behavior-tree 측 동시 작업** (sidecar 6 작성 + 이동 conversation, 2026-05-21):
-- `w_behavior_tree` (refactor/split-interfaces) 51f19ab: behavior_trees/*.meta.yaml × 6 (이후 본 conversation 에서 삭제)
-- `develop_bt` (main) fe76e5a: guide/04 §6 (root tree + sidecar 패턴) + guide/07 §1.4 (.meta.yaml + exposed_tree_ids 임팩트)
+**dev-behavior-tree 측 동시 작업**:
+- `w_behavior_tree` (refactor/split-interfaces):
+  - 51f19ab: behavior_trees/*.meta.yaml × 6 (이후 d48725c 에서 삭제 — sidecar 이동)
+  - d48725c: sidecar 삭제 (bt_execution_gui 로 이전)
+- `develop_bt` (main):
+  - fe76e5a: guide/04 §6 + guide/07 §1.4 (sidecar 작성 패턴)
+  - 286a638: guide §04/§07 sidecar 위치 갱신 (bt_execution_gui 측 박제)
+  - d574372: MoveTree 를 운영 GUI 노출 root 표로 이동 (2026-05-22)
 
 **sidecar 위치 재결정** (2026-05-21 후반): bt_execution_gui/bt_web_bridge/manifests/
 로 이동. 사유: 운영 자체 완결 + 운영자 단독 수정. drift 안전성은 Layer 3 self-check
-가 보장. docs/02 §2.1 의 trade-off 박제 + dev-behavior-tree 측 sidecar 삭제 commit
-+ develop_bt guide 갱신.
+가 보장. docs/02 §2.1 의 trade-off 박제.
+
+**MoveTree dual-use 결정** (2026-05-22): MoveTree.xml 을 SubTree only 에서 root +
+SubTree dual-use 로 재분류. NavSingleZoneAware 가 zone 관련 4 키 필수라 "단순
+이동" 도구로 부담스러운 점 해소. bt_schema_server 의 GetTreeSchema 가
+exposed_tree_ids 와 무관하게 모든 등록 트리 호출 가능하므로 (B-11 박제) SubTree
+역할 그대로 유지.
 
 완료:
 - 백엔드 풀스택 (Phase A + B + C1 + C2 + C3)
 - 빌드/테스트 통과 (bt_schema_server: 73 tests 0 fail / bt_web_bridge: 52 tests 0 fail)
 - 모든 endpoints (HTTP 15 + WebSocket 12 이벤트)
 - docs/ 5 개 문서 + 본 핸드오프 노트
-- ★ dev-behavior-tree 측 sidecar manifest 6 개 (Dock/Undock/NavSingleZoneAware/PassDoor/Elevator x2) — self-check 통과 (6 tree(s) verified)
-- ★ bt_schema_server fix 3 종 (SubTree literal / OUTPUT producer / exposed_tree_ids 필터)
+- ★ sidecar manifest **7 종** (MoveTree dual-use + Dock/Undock/NavSingleZoneAware/PassDoor/Elevator x2)
+  — self-check 7 tree(s) verified
+- ★ bt_schema_server fix 4 종 (SubTree literal / OUTPUT producer / exposed_tree_ids 필터 / threading._stop)
+- ★ **Phase D — Next.js frontend 8 페이지 완성** (Phase D-1 + D-2 + D-3)
+  - / Dashboard · /single · /scenarios{ /new /[id] /[id]/run } · /history{ /[id] }
+  - 토스풍 디자인 (frontend-design skill 활용) · Pretendard + Geist Mono · 144kB First Load
+  - npm run typecheck/lint/build all pass
 
-미완료:
-- **Phase D — Next.js frontend** (다음 작업)
-- v2 — lint 정착 / 위험 액션 confirm / 로봇 사전 점검 등 (`04_open_questions.md` 참조)
+미완료 (v2 / 별도 session):
+- v2 — lint 정착 / 위험 액션 confirm modal / 로봇 사전 점검 등 (§F)
+- frontend polish — ScenarioBuilder typed input UI 정식 통합 / dnd-kit / WS 로 history 자동 갱신
+- UpdateParamTree / CallSetBoolTree 도 dual-use root 노출 (MoveTree 패턴 반복)
+- OpenAPI → TS types 자동 generation (gen-api-types script — bt_web_bridge running 시점)
+- 사용자 환경 E2E 검증 (실 시나리오 생성 → 실행 → 이력 진입 골든 패스)
 
 ---
 
@@ -299,6 +326,101 @@ callable 아님 → `TypeError: 'Event' object is not callable`.
 private API 라 Python 버전별 변동 가능 — `_stop_event` / `_done` 같은 명시적
 이름 권장.
 
+### B-13. Frontend ↔ backend SSOT envelope 불일치 (Phase D-1 → e70adf2 정렬)
+
+frontend 가 backend 의 응답 형식을 잘못 가정해서 빈 list 표시 + 다수 mismatch.
+8 가지 mismatch 일괄 fix:
+
+1. **ApiOk envelope**: 모든 응답이 `{ok: true, data: <T>}` (api/common.py:ok())
+   - frontend fetch wrapper 가 envelope 자동 unwrap 해야 함. error 응답은
+     `{ok: false, error: {code, message, details?}}`. FastAPI HTTPException 은
+     `{detail: {code, message, details?}}` 형식 (별도 처리 필요).
+
+2. **TreeListItem vs TreeDetail 분리**:
+   - `/api/trees` → TreeListItem[] (요약, **param_count 만**, params 배열 없음)
+   - `/api/trees/{id}` → TreeDetail (상세, params: ParamSpec[])
+
+3. **ServerStatus 형식**: backend 는 `bt_web_bridge / bt_schema_server /
+   bt_execution_server status string + tree_count / scenario_count +
+   active_execution / self_check_passed_at`. `ok` 통합 필드 없음 — 각 component
+   별 reachability string 으로 판단.
+
+4. **ActiveExecutionInfo 형식**: `{execution_id, kind, tree_id (nullable),
+   scenario_id, current_step_idx, started_at}`. `kind: 'single' | 'scenario'`
+   (frontend 가 source 라고 가정했던 부분 — kind 로 통일).
+
+5. **WS event 추가 wrap**: ws_manager._send 가 한 layer 더 wrap →
+   `{type, ts, data: <inner>}` 형식. frontend 의 모든 ev 처리는 `ev.data.<field>`
+   접근. inner shapes 박제 (docs/03_api_protocol.md §3 + execution_runner.py +
+   scenario_engine.py + emergency.py):
+
+   - welcome: `{active_execution}`
+   - execution_started: `{execution_id, kind, tree_id, scenario_id, started_at}`
+   - execution_feedback: `{execution_id, message}`
+   - execution_finished: `{execution_id, final_status, result_message, finished_at}`
+   - emergency_stopped: `{cancelled, reason?}`
+   - error: `{code, message, execution_id?}`
+   - scenario_paused: `{execution_id, paused_after_step_idx, reason}`
+   - scenario_resumed: `{execution_id}`
+   - scenario_step_started: `{execution_id, step_idx, step_id, kind, tree_id}`
+   - scenario_step_finished: `{execution_id, step_idx, status, result_message, duration_ms}`
+   - scenario_step_feedback: `{execution_id, step_idx, message}`
+   - scenario_completed: `{execution_id, final_status, result_message, snapshot, finished_at}`
+
+6. **Validate request 형식**: `{params: {...}}` (payload 직접 아님). 응답은
+   `{valid: true, warnings}` 또는 `{valid: false, errors, warnings}`.
+
+7. **Execute request 형식**: `{tree_id, payload: {params: {...}}}`. 응답은
+   `{execution_id, tree_id, started_at, warnings}`.
+
+8. **path mismatch 함정**:
+   - `/api/cancel` ❌ → `/api/execute/cancel` ✅
+   - `/api/emergency_stop` ❌ → `/api/emergency-stop` ✅ (dash 사용)
+
+**원칙:** 새 endpoint / WS event 추가 시 frontend types 와 backend 동시 갱신.
+OpenAPI → TS 자동 생성 (`npm run gen-api-types`) 으로 mismatch 차단 가능 (단
+bt_web_bridge running 시점에만 가능 — 후속 작업).
+
+### B-14. TypeScript discriminated union — catch-all 분기 narrowing 망가뜨림 (Phase D-1)
+
+WS event 처리 위해 union 의 마지막에 `{type: string; [k: string]: unknown}` catch-all
+분기를 두면 specific 분기들의 narrowing 이 모두 unknown 으로 fallback → TS error
+다발. handoff 의 두 fix 회차 모두 catch-all 추가 → 제거 패턴 반복.
+
+**원칙:** discriminated union 은 specific literal type 만 포함. 알 수 없는 event
+는 runtime guard (typeof / 'data' in ev) 로 처리, union 의 외부 catch-all 금지.
+
+```ts
+// ❌ 나쁜 패턴
+type Event = {type: 'a', data: A} | {type: 'b', data: B} | {type: string; data: unknown};
+// ✅ 좋은 패턴
+type Event = {type: 'a', data: A} | {type: 'b', data: B};
+const ev = JSON.parse(msg) as Event;   // runtime 에서 unknown 은 ignore
+```
+
+### B-15. backend API path — dash vs underscore 일관성 부재 (Phase D-1)
+
+`/api/emergency-stop` (dash), `/api/execute/cancel` (subpath), `/api/scenarios/run/*`
+(subpath). frontend 측 client 작성 시 매번 backend router 파일을 grep 으로
+검증 필요. 단일 컨벤션 미정착 → mismatch 함정 잦음.
+
+**향후 v2**: backend path 컨벤션 명문화 (kebab-case + RESTful subpath) 또는
+OpenAPI 자동 generation 으로 차단.
+
+### B-16. SubTree only vs root tree 의 dual-use 분류 (2026-05-22)
+
+MoveTree 가 다른 root tree (Dock/Nav/PassDoor/Elevator) 의 SubTree 로만 호출되어
+"SubTree only" 로 분류 → sidecar 제외 → 운영자가 단순 이동 시 NavSingleZoneAware
+의 zone 관련 4 키를 강제로 입력해야 하는 함정.
+
+**해결 (3252f27 + d574372):** MoveTree 도 sidecar 작성 + exposed_tree_ids 등록 →
+dual-use. bt_schema_server 의 GetTreeSchema 는 exposed_tree_ids 와 무관하게 모든
+등록 트리 호출 가능 (B-11 박제 그대로). SubTree 호출 측 변경 zero.
+
+**원칙:** 트리가 "독립 실행 의미가 있는가?" 를 sidecar 작성의 기준으로. SubTree
+사용 여부는 별개 — dual-use 가 흔하고 안전한 패턴. 향후 UpdateParamTree /
+CallSetBoolTree 도 같은 패턴 적용 검토.
+
 ---
 
 ## C. 운영 / 통합 함정
@@ -392,43 +514,104 @@ default = Path.home() / '.bt_execution_gui' / 'scenarios'
 
 ---
 
-## E. Phase D (Next.js frontend) 시작 시 주의 사항
+## E. Phase D (Next.js frontend) — ★ 완료 (2026-05-21~22)
 
-### E-1. 추정 작업량 + 컨텍스트
+### E-0. Phase D 완료 요약
 
-- Next.js 14 + TypeScript + Tailwind + shadcn + dnd-kit + react-flow/react-archer + zustand + native WebSocket + react-hook-form + zod
-- 페이지 8 개: `/`, `/single`, `/scenarios`, `/scenarios/new`, `/scenarios/[id]`, `/scenarios/[id]/run`, `/history`, `/history/[id]`
-- 컴포넌트: TreeCard, ParamForm, ScenarioBuilder, ScenarioMonitor, EmergencyStopBar, HistoryTable
-- **추정 100~150k 토큰 → 새 conversation 권장**
+8 페이지 시리즈 100% 구축 + 토스풍 디자인 적용. handoff E-1 박제 stack 기반.
 
-### E-2. OpenAPI → TS 타입 자동 생성
+| 페이지 | 위치 | 핵심 |
+|---|---|---|
+| `/` | app/page.tsx | Dashboard — 7 TreeCard grid + ServerBadge |
+| `/single` | app/single/page.tsx | 트리 selector + 동적 ParamForm + ExecutionMonitor (WS) |
+| `/scenarios` | app/scenarios/page.tsx | 카드 grid + 삭제 confirm |
+| `/scenarios/new` | app/scenarios/new/page.tsx | 빈 빌더 → 저장 후 detail 이동 |
+| `/scenarios/[id]` | app/scenarios/[id]/page.tsx | 빌더 + If-Match optimistic lock |
+| `/scenarios/[id]/run` | app/scenarios/[id]/run/page.tsx | 모드 (auto / step_by_step) + ScenarioMonitor |
+| `/history` | app/history/page.tsx | HistoryTable + filter (kind) + pagination |
+| `/history/[id]` | app/history/[id]/page.tsx | step timeline + payload + snapshot |
+
+핵심 컴포넌트:
+- `EmergencyStopBar` — 전역 sticky + confirm modal + WS active_execution display
+- `TreeCard` — staggered fade-up + dangerous hatch + TreeIcon per kind
+- `ParamForm` — typed inputs (PoseStamped x/y/yaw/frame_id, int/double stepper, bool toggle, string enum select)
+- `ScenarioBuilder` — action/wait step + ▲▼ ordering + inline param
+- `ScenarioMonitor` — WS scenario_* 실시간 + pause/resume/next/cancel
+- `ExecutionMonitor` — WS execution_* 실시간 + duration
+- `TreeIcon` — kind 별 custom SVG (dock/undock/nav/door/elevator/generic)
+- `StatusPulse` — ring pulse animation
+
+기술 스택 확정:
+- Next.js 14.2.5 (App Router) + TypeScript 5.5 + Tailwind 3.4 + Motion 12.23
+- Pretendard Variable (KR/EN) + Geist Mono (코드/숫자)
+- 통신: next.config rewrites 로 `/api/*` → `:8000` proxy + native WebSocket
+  (exponential backoff reconnect)
+- Color: 흰색 base + signal red/blue/amber/green (CSS vars)
+
+### E-1. 사용자 환경 검증
+
+```bash
+# 터미널 1: schema_server (bt_xml_dir 명시 + plugin_lib_names yaml)
+ros2 run bt_schema_server bt_schema_server_node --ros-args \
+    --params-file <install>/share/bt_schema_server/config/bt_schema_server.yaml \
+    -p bt_xml_dir:=<w_behavior_tree>/behavior_trees
+
+# 터미널 2: bt_web_bridge (default manifest-dir = share/bt_web_bridge/manifests)
+ros2 run bt_web_bridge bt_web_bridge --port 8000
+
+# 터미널 3: frontend
+cd bt_execution_gui/frontend && npm install && npm run dev   # :3000
+```
+
+dev server 가 hot reload 지원 — 코드 수정 시 browser refresh 만 하면 적용.
+
+### E-2. OpenAPI → TS 타입 자동 생성 (★ 후속 미완)
 
 bt_web_bridge 가 FastAPI 자동 `/openapi.json` 노출. `openapi-typescript` 로 TS 타입 생성:
 ```bash
-npx openapi-typescript http://localhost:8000/openapi.json -o frontend/src/api/types.ts
+cd frontend && npm run gen-api-types
+# = npx openapi-typescript http://localhost:8000/openapi.json -o src/api/types.gen.ts
 ```
 
-→ API 응답 타입을 hand-typing 회피.
+bt_web_bridge running 시점에만 가능. Phase D 1차 구축 시점에는 manual `lib/types.ts`
+사용 — B-13 의 모든 mismatch 가 manual 의 한계 (1차 환각 → 실 환경 검증 후 정렬).
+**v2 권장**: CI 에서 자동 생성 + types.ts 가 generated 만 re-export.
 
-### E-3. WebSocket reconnect + welcome snapshot 활용
+### E-3. WebSocket reconnect + welcome snapshot 활용 (★ 적용됨)
 
-`docs/03_api_protocol.md` §3.4 의 exponential backoff. `welcome` 이벤트의 `active_execution` 으로 UI 상태 복원 — polling 불필요.
+frontend `hooks/useWebSocket.ts` 가 exponential backoff (1s → 2s → 4s → … 16s cap)
++ 50-event ring buffer. `welcome` 의 `active_execution` 으로 EmergencyStopBar
+상태 복원 — polling 불필요.
 
-### E-4. frontend-design skill
+### E-4. frontend-design skill (★ 활용됨)
 
-본 conversation 에서는 안 썼지만 Phase D 에서는 `frontend-design` skill 활용 가치 큼 (토스풍 디자인 강조).
+Phase D 진입 시 `frontend-design:frontend-design` skill 호출 → 토스풍 +
+운영 콘솔 디자인 가이드. 결과적으로 정착한 디자인 토큰 / 컬러 / 타이포는
+`globals.css` + `tailwind.config.ts` 박제.
 
-### E-5. dev-behavior-tree 측 manifest 의존
+### E-5. sidecar manifest 위치 (재결정 후)
 
-`docs/04_open_questions.md` 의 dev-behavior-tree 측 작업 (sidecar yaml 6 개) 이 없으면 self-check 실패 → bt_web_bridge startup 거부 → frontend 도 백엔드 연결 불가.
+sidecar 는 **bt_execution_gui/bt_web_bridge/manifests/** 에 위치 (2026-05-21 재결정).
+install 시 `share/bt_web_bridge/manifests/` 로 ament 자동 배포. `--manifest-dir`
+default 가 ament_index_python 으로 자동 resolve.
 
-**개발 시 우회:** `--skip-self-check` 플래그로 self-check 우회. 또는 빈 manifest 만 작성하여 통과. Phase D 의 UI 개발은 backend 가 떠 있어야 하므로 임시 sidecar 1-2 개 준비.
+dev 모드에서 임시 manifest 만 둘 필요 없음 — 7 sidecar 가 기본 install.
 
-### E-6. payload validator UI 와 server 일치
+### E-6. payload validator UI 와 server 일치 (★ 적용됨)
 
-`/api/trees/{id}/validate` 응답의 `errors` + `warnings` 가 server-side 진실. frontend 의 react-hook-form + zod 는 UX 친화적 first-pass 검증 + 서버 응답으로 final check.
+`/api/trees/{id}/validate` 응답의 `errors`/`warnings` 가 server-side 진실.
+**ParamForm 이 typed 입력 UI 만 제공하고 검증은 100% 서버 round-trip** — TS 재구현
+zero (B-22 위반 자동 회피).
 
-`payload_validator.py:PayloadValidator.validate` 의 로직을 TS 로 재구현하지 말 것 — `/validate` endpoint 호출이 SSOT.
+### E-7. dual-use root tree 패턴 (B-16)
+
+운영 GUI 노출 sidecar = "운영자가 독립 실행 의미가 있는 트리" 의 정의.
+다른 root tree 의 SubTree 로도 호출되는 트리도 dual-use 로 노출 가능 (MoveTree
+예시). bt_schema_server 의 GetTreeSchema 는 exposed_tree_ids 와 무관하게 모든
+등록 트리 호출 가능 (B-11) → SubTree 역할 그대로 유지.
+
+향후 검토: UpdateParamTree (단발 alias 적용), CallSetBoolTree (단발 service 호출)
+도 같은 패턴 적용 가능.
 
 ---
 
@@ -436,16 +619,29 @@ npx openapi-typescript http://localhost:8000/openapi.json -o frontend/src/api/ty
 
 `04_open_questions.md` 의 다음 항목들은 v0.1 외 작업으로 보존:
 
+### Frontend / UI
+- **위험 액션 confirm 모달** (E-1): manifest 의 `dangerous: true` 시 ParamForm
+  의 실행 버튼 클릭 → 최종 확인 modal (현재는 button 색만 변함)
+- **ScenarioBuilder polish**: action step 의 정식 typed input UI 통합 (현재 inline
+  text format) + dnd-kit drag handle (현재 ▲▼ 버튼)
+- **WS 로 history 자동 갱신**: 현재 새로고침 수동. `execution_finished` /
+  `scenario_completed` 시점에 자동 invalidate
+- **OpenAPI → TS 자동 생성 정착** (E-2): CI 에서 generate + types.ts 가 wrapper
+- **사용자 친화 에러 메시지 매트릭스** (B-9): §06 §11.5 → 한국어 UI 친화
+- **dangerous = false 의 simple 도구 추가 노출** (B-16 dual-use 패턴):
+  UpdateParamTree / CallSetBoolTree
+
+### Backend / 운영
 - **lint 정착** (C-6): ruff + black + ament lint disable
-- **위험 액션 confirm 모달** (E-1): manifest 의 `dangerous: true` 활용
 - **로봇 사전 상태 점검** (E-2): nav2 lifecycle / battery / e-stop 구독
 - **scenario schema_version 마이그레이션** (A-1)
 - **history 보존 정책 final** (A-2)
-- **사용자 친화 에러 메시지 매트릭스** (B-9): §06 §11.5 → 한국어 UI 친화
 - **wait step 중간 pause** (현재는 step boundary 만 — `scenario_engine.py:_run_wait_step` 의 TODO)
 - **시나리오 dry-run endpoint** (D-3)
 - **시나리오 export/import** (D-4)
 - **백엔드 재시작 시 in-flight goal cleanup** (E-4)
+- **schema_server multi-instance 가드** (H §9): systemd + single-instance lockfile
+- **backend API path 컨벤션 명문화** (B-15): kebab-case + RESTful subpath
 
 ---
 
@@ -475,10 +671,16 @@ ros2 run bt_schema_server bt_schema_server_node --ros-args \
     -p "plugin_lib_names:=[w_nav_single_action_bt_node, ...]"
 
 # 실행 — bt_web_bridge (그 다음)
-ros2 run bt_web_bridge bt_web_bridge \
-    --manifest-dir $(pwd)/w_behavior_tree/w_behavior_tree/behavior_trees \
-    --skip-self-check \    # ★ manifest yaml 없으면 임시 필요
-    --port 8000
+#   default --manifest-dir = share/bt_web_bridge/manifests/ (ament_index_python
+#   lookup, sidecar 7 종 자동 install). 추가 인자 불필요.
+ros2 run bt_web_bridge bt_web_bridge --port 8000
+
+# frontend (dev)
+cd bt_execution_gui/frontend
+npm install
+npm run dev    # :3000, next.config rewrites 가 /api/* → :8000 proxy
+# 빌드 검증
+npm run typecheck && npm run lint && npm run build
 
 # API 테스트
 curl http://localhost:8000/api/status
@@ -502,16 +704,27 @@ websocat ws://localhost:8000/api/ws
 7. **scenario `pause` 가 wait step 중간에는 불가** — `_run_wait_step` 의 TODO. v2 작업
 8. ~~**`_RclpyThread._stop()` TypeError**~~ — 해결됨 (B-12 박제). attribute 이름을 `_stop` → `_stop_event` 로 rename 하여 `threading.Thread` 의 private method 와 충돌 회피.
 9. **schema_server 의 ros2 multi-instance 위험** — 같은 service 이름으로 두 노드 동시 실행 시 latching 없이 race. 운영 launch 가 systemd 또는 single-instance 가드 필요 (C-1 의 운영 자동화 일부).
+10. **frontend lib/types.ts manual maintenance** — backend pydantic models 변경 시 frontend types 도 같이 손봐야 함. E-2 의 자동 생성 정착 전까지 mismatch 함정 잠재 (B-13 의 잠재 반복).
+11. **ScenarioBuilder action step 의 param input 이 단순 text format** — typed object 가 아닌 `1.5,2.0,0,map` 같은 csv 형식. ParamForm 의 정식 typed UI 통합은 F § Frontend polish.
+12. **사용자 환경 E2E 검증 미수행** — Phase D 8 페이지가 browser 에서 정상 시나리오 (트리 실행 / 시나리오 생성 / step-by-step / 이력 진입) 실 검증 필요. dev mode hot reload 라 issue 발견 시 fix 빠름.
 
 ---
 
 ## I. 다른 agent 를 위한 한 줄 가이드
 
-> **"docs/ 5 개 + 본 핸드오프 노트를 모두 읽은 뒤 작업 시작. 코드 작성 전에 `feedback_commit_safety.md` 를 메모리에서 확인. 빌드/테스트 통과 후 commit + push. context 50% 마다 `/context` 점검. 큰 모듈은 sub-phase 로 분할."**
+> **"docs/ 5 개 + 본 핸드오프 노트를 모두 읽은 뒤 작업 시작. 코드 작성 전에 `feedback_commit_safety.md` 를 메모리에서 확인. 빌드/테스트 통과 후 commit + push. context 50% 마다 `/context` 점검. 큰 모듈은 sub-phase 로 분할. backend 형식 변경 시 frontend types.ts/client.ts 동시 갱신 (B-13)."**
 
 핵심 SSOT 우선순위:
 1. **본 conversation 의 commit log + 본 핸드오프 노트** — 무엇을 했는지
-2. **docs/01_system_design.md** — 무엇을 해야 하는지 (Phase D 등)
+2. **docs/01_system_design.md** — 무엇을 해야 하는지
 3. **docs/04_open_questions.md** — 무엇을 결정 안 했는지 + 사유
 4. **dev-behavior-tree/develop_bt/guide/** — BT 자체 작업이라면 그 protocol 우선
 5. **각 패키지의 README.md** — 그 패키지 사용/빌드/실행 방법
+
+Phase D 후속 작업자 mental model:
+- bt_web_bridge `lib/types.ts` 와 backend `bt_web_bridge/bt_web_bridge/models.py` 는
+  현재 manual sync. 변경 시 양쪽 동시. CI 자동 생성 (E-2) 정착 전 mismatch 위험 항상.
+- frontend dev server 가 hot reload — code 수정 시 browser refresh 만 하면 적용.
+  단 next.config 변경 시는 dev server 재기동 필요.
+- ScenarioBuilder + ScenarioMonitor + ExecutionMonitor 모두 WS event 의 `ev.data.<field>`
+  접근. B-13 의 inner shapes 표 참조.
