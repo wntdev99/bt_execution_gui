@@ -1,0 +1,58 @@
+# bt_execution_gui Layer 1 — MoveTree sidecar manifest
+# SSOT: bt_execution_gui/docs/02_schema_extraction.md §2
+# 대응 트리: dev-behavior-tree/w_behavior_tree/w_behavior_tree/behavior_trees/MoveTree.xml
+#
+# 운영 GUI 의 "단순 이동" 도구. NavSingleAction 단순 wrapper (zone-aware/finally 등
+# 부가 로직 없음). 다른 시나리오 트리 (DockTree/NavSingleZoneAware/PassDoor/Elevator)
+# 가 SubTree 로 호출하는 building block 이기도 한 dual-use 트리 —
+# bt_schema_server 가 GetTreeSchema 를 모든 등록 트리에 대해 호출 가능하므로 SubTree
+# 역할은 그대로 유지.
+tree_id: MoveTree
+display_name: "단순 이동"
+description: |
+  지정한 위치로 이동 (NavSingleAction wrapper). zone 인식 / 파라미터 자동 전환 /
+  finally 복원 없음 — 가장 가벼운 이동 도구. 부가 제어가 필요하면 NavSingleZoneAware
+  를 사용.
+  성공 조건: NavSingleAction 결과 SUCCESS (error_code == 0)
+category: single
+dangerous: false
+estimated_duration_sec: 30
+params:
+  - key: goal_pose
+    type: PoseStamped
+    required: true
+    description: "목적 위치."
+  - key: timeout_ms
+    type: int
+    required: false
+    default: 30000
+    range: [1000.0, 600000.0]
+    description: "네비게이션 타임아웃 (ms)."
+  - key: replan_period_ms
+    type: int
+    required: false
+    default: 1000
+    range: [100.0, 60000.0]
+    description: "경로 재계획 주기 (ms)."
+  - key: goal_checker_name
+    type: string
+    required: false
+    default: ""
+    description: "Nav goal_checker plugin 이름. 빈 string = navigator default."
+  - key: progress_checker_name
+    type: string
+    required: false
+    default: ""
+    description: "Nav progress_checker plugin 이름. 빈 string = navigator default."
+  - key: pass_final_goal_tol
+    type: double
+    required: false
+    default: 0.0
+    range: [0.0, 5.0]
+    description: "통과 판정 임계값 (m). >0 활성, <=0 비활성."
+  - key: recovery_mode
+    type: string
+    required: false
+    default: ""
+    enum: ["", "stop_and_go", "avoidance"]
+    description: "Nav 회복 모드. 빈 string = navigator 자동 결정."

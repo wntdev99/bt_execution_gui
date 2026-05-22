@@ -21,6 +21,7 @@ bt_schema_server:
     # 빈 list 면 backward-compat 으로 등록 트리 전체 노출.
     # 운영 시 본 list 와 sidecar meta.yaml 1:1 매칭 — Layer 3 self-check 가 검증.
     exposed_tree_ids:
+      - MoveTree
       - DockTree
       - UndockTree
       - NavSingleZoneAware
