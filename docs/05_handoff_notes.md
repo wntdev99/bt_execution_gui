@@ -455,6 +455,52 @@ TypeError: float() argument must be a string or a real number, not 'NoneType'
   포함 검사. `float(value[k])` 같은 raw conversion 은 try/except 또는 dedicated
   coerce helper 로 graceful error.
 
+### B-18. BT.CPP 4 root_blackboard 의 `{key}` ↔ globalBlackboard cascade 누락 (2026-05-22 fix, w_behavior_tree)
+
+**시그니처:**
+```
+[bt_execution_server]: Blackboard [PoseStamped] goal_pose = (...)
+[NavSingleAction] pose 포트가 설정되지 않았습니다.
+[NavSingleAction] 액션 실패: INVALID_GOAL
+```
+→ globalBlackboard 에는 set 되었는데 leaf 노드의 `pose="{goal_pose}"` lookup
+실패.
+
+**근본 원인:**
+- `behaviortree_ros2/src/tree_execution_server.cpp:193`:
+  `auto root_blackboard = BT::Blackboard::create(p_->global_blackboard);`
+  → root_blackboard 는 global 을 parent 로 가짐. 단 `autoremapping_=false` (default).
+- `BehaviorTree.CPP/src/blackboard.cpp:53-85` Blackboard::getEntry:
+  parent cascade 는 `autoremapping_=true` 또는 explicit `internal_to_external_`
+  remap 시에만. default 는 자기 storage 만 검색.
+- bt_execution_server 가 globalBlackboard 에만 payload 키 set → root_blackboard
+  의 `{key}` lookup miss.
+
+**이전에 못 발견된 이유:**
+- 다른 root tree (Dock/Nav../PassDoor/Elevator) 는 NavSingleAction 같은 leaf 를
+  직접 binding 안 하고 MoveTree 를 SubTree 로 호출. SubTreeNode 가 `_autoremap=
+  "true"` 시 child BB 의 autoremapping_=true 설정 → 그 단계에서 cascade 활성화.
+- MoveTree 자체를 root 로 실행하는 시나리오가 commit 3252f27 (MoveTree dual-use
+  노출) 후 처음 등장 → root_blackboard cascade 함정 표면화.
+
+**해결 (한 줄, commit 32db593 in w_behavior_tree):**
+```cpp
+void onTreeCreated(BT::Tree & tree) override {
+  // ...
+  tree.rootBlackboard()->enableAutoRemapping(true);
+  // ...
+}
+```
+
+**부작용 평가:**
+- global set 키 = payload 키 + 자동주입 5 종 (B-28). 운영 7 root tree 의 internal
+  key 와 충돌 zero.
+
+**원칙:** BT.CPP 4 의 `Blackboard::create(parent)` 은 parent 를 가지지만 cascade
+default-off. 운영 root tree 의 leaf 노드 binding 이 global 접근하려면:
+  (a) root_blackboard 의 autoremap enable (본 fix 가 채택), 또는
+  (b) `{@key}` 명시 syntax (XML 측 일괄 수정 — 부담 큼)
+
 ### C-1. dev-behavior-tree 와의 자동 주입 키 5 종 sync
 
 `bt_schema_server/src/schema_builder.cpp:autoInjectedKeys()` 는 **dev-behavior-tree 의 bt_execution_server.cpp:103-113 의 5 키와 100% sync** 필요:
