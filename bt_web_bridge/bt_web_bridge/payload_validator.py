@@ -159,18 +159,39 @@ class PayloadValidator:
                     f"payload={value['type']}",
                 ])
             if spec.type == 'PoseStamped':
-                # PoseStamped 는 value 없이 x/y/yaw/frame_id 직접
+                # PoseStamped 는 value 없이 x/y/yaw/frame_id 직접.
+                # null/NaN/문자열 등 비정상 값에 대해 graceful ValidationError —
+                # 이전에는 float(None) 이 uncaught TypeError 로 ASGI 500 유발.
+                # (frontend ScenarioBuilder 의 csv 일부 입력이 Number(undefined)=NaN
+                # → JSON null 로 직렬화되는 함정. frontend 측에도 fallback 추가.)
                 for required_key in ('x', 'y'):
-                    if required_key not in value:
+                    if required_key not in value or value[required_key] is None:
                         raise PayloadValidationError([
-                            f"'{spec.key}': PoseStamped 의 '{required_key}' 누락",
+                            f"'{spec.key}': PoseStamped 의 '{required_key}' 누락 "
+                            f"또는 null",
                         ])
+
+                def _coerce(field: str, raw: object, default: float = 0.0) -> float:
+                    if raw is None:
+                        return default
+                    if isinstance(raw, bool):
+                        raise PayloadValidationError([
+                            f"'{spec.key}.{field}': PoseStamped 좌표가 bool 형식 — 숫자 필요",
+                        ])
+                    try:
+                        return float(raw)
+                    except (TypeError, ValueError):
+                        raise PayloadValidationError([
+                            f"'{spec.key}.{field}': PoseStamped 좌표 변환 실패 — "
+                            f"받음 {raw!r}",
+                        ]) from None
+
                 return {
-                    'x': float(value['x']),
-                    'y': float(value['y']),
-                    'z': float(value.get('z', 0.0)),
-                    'yaw': float(value.get('yaw', 0.0)),
-                    'frame_id': str(value.get('frame_id', 'map')),
+                    'x': _coerce('x', value['x']),
+                    'y': _coerce('y', value['y']),
+                    'z': _coerce('z', value.get('z'), 0.0),
+                    'yaw': _coerce('yaw', value.get('yaw'), 0.0),
+                    'frame_id': str(value.get('frame_id', 'map') or 'map'),
                 }
             v = value.get('value')
             if v is None:

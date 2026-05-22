@@ -592,12 +592,23 @@ function packTyped(text: string, spec: ParamSpec): unknown {
       return { type: 'bool', value: b };
     }
     case 'PoseStamped': {
+      // csv 일부만 입력 (예: "1.5") 시 parts[1]=undefined → Number(undefined)=NaN
+      // → JSON.stringify 가 null 로 직렬화 → backend 가 None float() 으로 crash.
+      // 안전한 fallback (빈/undefined/NaN → 0) 으로 backend graceful 검증 받기.
       const parts = trimmed.split(',').map((s) => s.trim());
-      const x = Number(parts[0] ?? 0);
-      const y = Number(parts[1] ?? 0);
-      const yaw = Number(parts[2] ?? 0);
-      const frame_id = parts[3] || 'map';
-      return { type: 'PoseStamped', x, y, yaw, frame_id };
+      return {
+        type: 'PoseStamped',
+        x: safeNum(parts[0]),
+        y: safeNum(parts[1]),
+        yaw: safeNum(parts[2]),
+        frame_id: (parts[3] && parts[3].length > 0) ? parts[3] : 'map',
+      };
     }
   }
+}
+
+function safeNum(v: string | undefined, fallback = 0): number {
+  if (v === undefined || v === null || v === '') return fallback;
+  const n = Number(v);
+  return Number.isNaN(n) ? fallback : n;
 }

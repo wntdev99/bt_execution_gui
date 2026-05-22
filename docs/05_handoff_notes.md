@@ -421,9 +421,39 @@ dual-use. bt_schema_server 의 GetTreeSchema 는 exposed_tree_ids 와 무관하�
 사용 여부는 별개 — dual-use 가 흔하고 안전한 패턴. 향후 UpdateParamTree /
 CallSetBoolTree 도 같은 패턴 적용 검토.
 
----
+### B-17. JS `Number(undefined)`=NaN + JSON null 직렬화 → backend `float(None)` crash (2026-05-22 fix)
 
-## C. 운영 / 통합 함정
+**시그니처:**
+```
+File ".../payload_validator.py", line 169, in _extract_and_check_type
+    'x': float(value['x']),
+TypeError: float() argument must be a string or a real number, not 'NoneType'
+```
+
+**근본 원인 (frontend → backend 양쪽 부주의):**
+1. `ScenarioBuilder.packTyped` 의 PoseStamped 처리에서 csv 일부만 입력 (예: `"1.5"`)
+   시 `parts[1] = undefined` → `Number(undefined) = NaN`.
+2. `JSON.stringify(NaN) === "null"` (ECMAScript 표준) → backend 에 `{x: 1.5, y: null,
+   yaw: null, ...}` 전송.
+3. backend `payload_validator._extract_and_check_type` 의 PoseStamped 처리가
+   `'x' in value` 만 check 하고 None 검사 안 함 → `float(None)` uncaught TypeError →
+   FastAPI ASGI 500.
+
+**해결 (frontend + backend 양쪽):**
+- `ScenarioBuilder.packTyped`: `safeNum(parts[i], 0)` helper — `undefined`/`null`/
+  빈 string/`NaN` 모두 fallback 0. `JSON.stringify` 이전에 차단.
+- `payload_validator._extract_and_check_type`: PoseStamped 처리에서 `value[k]
+  is None` check + `_coerce()` helper 가 `float()` 을 try/except + bool 차단 +
+  String/숫자 외 graceful `PayloadValidationError`. 운영자에게 친화적 에러 메시지
+  ("PoseStamped 의 'x' 누락 또는 null").
+
+**일반 원칙:**
+- JS frontend ↔ Python backend 경계에서 numeric field 의 null safety 는 양쪽 모두
+  명시. JSON spec 에 NaN/Infinity 없음 → JS Number 의 NaN/Infinity 가 null 로
+  silent corruption.
+- backend 의 typed field validation 에서 `key in value` 만 검사 금지 — 항상 None
+  포함 검사. `float(value[k])` 같은 raw conversion 은 try/except 또는 dedicated
+  coerce helper 로 graceful error.
 
 ### C-1. dev-behavior-tree 와의 자동 주입 키 5 종 sync
 
