@@ -92,6 +92,32 @@ export function ScenarioBuilder({ initial, onSaved, onCancel }: Props) {
     setState((s) => ({ ...s, steps: s.steps.filter((_, i) => i !== idx) }));
   }
 
+  function duplicateStep(idx: number) {
+    setState((s) => {
+      const src = s.steps[idx];
+      if (!src) return s;
+      // 깊은 복사 + step_id 충돌 회피.
+      const used = new Set(s.steps.map((st) => st.step_id));
+      let candidate = `${src.step_id}_copy`;
+      let n = 2;
+      while (used.has(candidate)) {
+        candidate = `${src.step_id}_copy${n}`;
+        n += 1;
+      }
+      const cloned: ScenarioStep = {
+        ...src,
+        step_id: candidate,
+        // payload 깊은 복사 — 사용자가 사본 수정 시 원본 영향 없게
+        payload: src.payload
+          ? { params: { ...(src.payload.params ?? {}) } }
+          : null,
+      };
+      const next = [...s.steps];
+      next.splice(idx + 1, 0, cloned);
+      return { ...s, steps: next };
+    });
+  }
+
   function moveStep(idx: number, delta: -1 | 1) {
     setState((s) => {
       const newIdx = idx + delta;
@@ -213,6 +239,7 @@ export function ScenarioBuilder({ initial, onSaved, onCancel }: Props) {
                     onChange={(patch) => updateStep(idx, patch)}
                     onMove={(delta) => moveStep(idx, delta)}
                     onRemove={() => removeStep(idx)}
+                    onDuplicate={() => duplicateStep(idx)}
                   />
                 </motion.div>
               ))}
@@ -300,6 +327,7 @@ function StepRow({
   onChange,
   onMove,
   onRemove,
+  onDuplicate,
 }: {
   idx: number;
   step: ScenarioStep;
@@ -309,6 +337,7 @@ function StepRow({
   onChange: (patch: Partial<ScenarioStep>) => void;
   onMove: (delta: -1 | 1) => void;
   onRemove: () => void;
+  onDuplicate: () => void;
 }) {
   return (
     <div className="rounded-xl border border-border bg-surface p-3">
@@ -344,6 +373,9 @@ function StepRow({
               className="h-7 flex-1 rounded-md border border-border bg-bg px-2 font-mono text-caption"
               placeholder="step_id"
             />
+            <IconButton onClick={onDuplicate} title="이 step 을 아래에 복제">
+              ⎘
+            </IconButton>
             <IconButton onClick={onRemove} title="삭제" danger>
               ✕
             </IconButton>

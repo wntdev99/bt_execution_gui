@@ -650,6 +650,11 @@ zero (B-22 위반 자동 회피).
 `04_open_questions.md` 의 다음 항목들은 v0.1 외 작업으로 보존:
 
 ### Frontend / UI
+- **★ 단일 액션 저장/재사용 (saved_actions)** (사용자 결정 옵션 B, 2026-05-22):
+  새 backend storage (saved_actions/ — yaml 또는 sqlite) + CRUD endpoint
+  `/api/saved-actions` + frontend 새 페이지 `/saved-actions` + ParamForm 의
+  "저장된 액션 선택" dropdown + ScenarioBuilder 의 action step 의 "저장된 액션
+  불러오기" 통합. ★ 큰 작업 — 별도 session 권장
 - **위험 액션 confirm 모달** (E-1): manifest 의 `dangerous: true` 시 ParamForm
   의 실행 버튼 클릭 → 최종 확인 modal (현재는 button 색만 변함)
 - **ScenarioBuilder polish**: action step 의 정식 typed input UI 통합 (현재 inline
@@ -737,6 +742,9 @@ websocat ws://localhost:8000/api/ws
 10. **frontend lib/types.ts manual maintenance** — backend pydantic models 변경 시 frontend types 도 같이 손봐야 함. E-2 의 자동 생성 정착 전까지 mismatch 함정 잠재 (B-13 의 잠재 반복).
 11. **ScenarioBuilder action step 의 param input 이 단순 text format** — typed object 가 아닌 `1.5,2.0,0,map` 같은 csv 형식. ParamForm 의 정식 typed UI 통합은 F § Frontend polish.
 12. **사용자 환경 E2E 검증 미수행** — Phase D 8 페이지가 browser 에서 정상 시나리오 (트리 실행 / 시나리오 생성 / step-by-step / 이력 진입) 실 검증 필요. dev mode hot reload 라 issue 발견 시 fix 빠름.
+13. ~~**단일 실행이 /history 에 안 뜸**~~ — 해결됨 (2026-05-22). execute API 가 history_db.start_execution 호출 + execution_runner 가 finish_execution 호출. 이전: scenario_engine 만 history 기록 → single 실행 누락.
+14. ~~**PoseStamped 좌표 input "-" 입력 → NaN + 커서 reset**~~ — 해결됨. ParamForm `PoseField` 가 raw text 자체 state 로 유지 + valid finite number 일 때만 parent 전파. `type="number"` 대신 `type="text" inputMode="decimal"` 로 음수/소수점 transient 입력 (`-`, `.`, `-.`) 모두 안정 표시.
+15. ~~**시나리오 첫 action 이 RUNNING 으로 표시 안 됨**~~ — 해결됨. ScenarioMonitor 를 `executionId=null` 일 때도 항상 mount → useWebSocket connection 미리 활성 → backend 의 첫 `scenario_step_started` 이벤트 누락 회피. 이전: `{executionId && <ScenarioMonitor/>}` 조건부 mount 라 mount 시점에 첫 event 이미 끝남.
 
 ---
 

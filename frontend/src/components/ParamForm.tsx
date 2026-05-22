@@ -14,7 +14,7 @@
  * errors/warnings 를 UI 에 표시. validate.valid === true → /api/execute 호출.
  */
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { api, ApiError } from '@/api/client';
 import { cn } from '@/lib/utils';
@@ -378,6 +378,14 @@ function ParamInput({
   }
 }
 
+/**
+ * PoseStamped 좌표 필드 — controlled input 의 "-" / "1.5e" / "1." 같은 transient
+ * 입력이 NaN 으로 state 에 들어가 cursor reset 되는 함정 회피 (Bug #5).
+ *
+ * 전략: raw text 를 자체 state 로 유지, 사용자가 입력 중에는 그대로 표시.
+ * Number 변환 결과가 valid 일 때만 parent onChange 전파. 빈 string / 변환 불가능
+ * → undefined 전파. parent value 변경 시에는 raw 도 sync (외부 reset 대응).
+ */
 function PoseField({
   label,
   unit,
@@ -389,19 +397,51 @@ function PoseField({
   value: number | undefined;
   onChange: (v: number | undefined) => void;
 }) {
+  const [raw, setRaw] = useState<string>(
+    value === undefined || Number.isNaN(value) ? '' : String(value),
+  );
+
+  // value prop 변경 (외부 reset 등) 시 raw 도 sync — raw 가 같은 숫자를
+  // 표현하면 유지 (cursor 보호).
+  useEffect(() => {
+    const parsed = raw === '' ? undefined : Number(raw);
+    if (
+      (value === undefined && parsed === undefined) ||
+      (value !== undefined && parsed !== undefined && parsed === value)
+    ) {
+      return;   // 사용자 입력과 일치 — 그대로 둠
+    }
+    setRaw(value === undefined || Number.isNaN(value) ? '' : String(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const text = e.target.value;
+    setRaw(text);
+    if (text === '' || text === '-' || text === '.' || text === '-.') {
+      // transient — parent 에는 undefined (입력 중)
+      onChange(undefined);
+      return;
+    }
+    const n = Number(text);
+    if (Number.isFinite(n)) {
+      onChange(n);
+    }
+    // NaN/Infinity 는 parent 갱신 안 함 — raw 만 유지 (UX 안정)
+  }
+
   return (
     <div className="flex flex-col gap-0.5">
       <label className="font-mono text-[0.6875rem] text-text-mute">
         {label} <span className="text-text-sub">({unit})</span>
       </label>
       <input
-        type="number"
-        step="0.01"
+        type="text"
+        inputMode="decimal"
         className="h-8 rounded-md border border-border bg-bg px-2 font-mono text-caption tabular"
-        value={value ?? ''}
-        onChange={(e) =>
-          onChange(e.target.value === '' ? undefined : Number(e.target.value))
-        }
+        value={raw}
+        onChange={handleChange}
+        placeholder="0"
       />
     </div>
   );

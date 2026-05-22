@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAsync } from '@/hooks/useApi';
@@ -17,8 +18,30 @@ import type { ScenarioListItem } from '@/lib/types';
  * - 카드 우측 작업: 실행 / 편집 / 삭제
  */
 export default function ScenariosPage() {
+  const router = useRouter();
   const list = useAsync(() => api.scenarios.list());
   const [confirmDelete, setConfirmDelete] = useState<ScenarioListItem | null>(null);
+  const [dupBusy, setDupBusy] = useState<string | null>(null);
+  const [dupErr, setDupErr] = useState<string | null>(null);
+
+  async function handleDuplicate(item: ScenarioListItem) {
+    setDupBusy(item.id);
+    setDupErr(null);
+    try {
+      const full = await api.scenarios.get(item.id);
+      const created = await api.scenarios.create({
+        display_name: `${full.display_name} (사본)`,
+        description: full.description,
+        steps: full.steps,
+      });
+      router.push(`/scenarios/${encodeURIComponent(created.id)}`);
+    } catch (e) {
+      if (e instanceof ApiError) setDupErr(`${e.code ?? e.status} · ${e.message}`);
+      else setDupErr(e instanceof Error ? e.message : '복제 실패');
+    } finally {
+      setDupBusy(null);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-10">
@@ -57,6 +80,12 @@ export default function ScenariosPage() {
         </div>
       )}
 
+      {dupErr && (
+        <div className="rounded-xl bg-danger-soft p-3 text-caption text-danger">
+          {dupErr}
+        </div>
+      )}
+
       {list.data && list.data.length > 0 && (
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {list.data.map((sc, i) => (
@@ -64,7 +93,9 @@ export default function ScenariosPage() {
               key={sc.id}
               item={sc}
               index={i}
+              dupBusy={dupBusy === sc.id}
               onDelete={() => setConfirmDelete(sc)}
+              onDuplicate={() => handleDuplicate(sc)}
             />
           ))}
         </section>
@@ -89,11 +120,15 @@ export default function ScenariosPage() {
 function ScenarioCard({
   item,
   index,
+  dupBusy,
   onDelete,
+  onDuplicate,
 }: {
   item: ScenarioListItem;
   index: number;
+  dupBusy: boolean;
   onDelete: () => void;
+  onDuplicate: () => void;
 }) {
   return (
     <motion.div
@@ -130,6 +165,14 @@ function ScenarioCard({
           >
             편집
           </Link>
+          <button
+            onClick={onDuplicate}
+            disabled={dupBusy}
+            className="rounded-full px-2 py-1 text-[0.75rem] text-text-sub hover:bg-accent-soft hover:text-accent disabled:opacity-50"
+            title="이 시나리오를 복제해 새 시나리오 생성"
+          >
+            {dupBusy ? '복제 중…' : '복제'}
+          </button>
           <button
             onClick={onDelete}
             className="rounded-full px-2 py-1 text-[0.75rem] text-text-mute hover:bg-danger-soft hover:text-danger"

@@ -115,13 +115,14 @@ export default function ScenarioRunPage({ params }: { params: { id: string } }) 
         </div>
       )}
 
-      {executionId && (
-        <ScenarioMonitor
-          scenario={scenario}
-          executionId={executionId}
-          mode={mode}
-        />
-      )}
+      {/* Monitor 는 항상 mount — executionId=null 일 때 idle UI 로 WebSocket
+         connection 미리 활성화. 사용자 ▶ 클릭 → execution_id set 시점에 monitor
+         가 이미 WS 구독 중이라 첫 scenario_step_started 누락 회피 (Bug #6 fix). */}
+      <ScenarioMonitor
+        scenario={scenario}
+        executionId={executionId}
+        mode={mode}
+      />
     </div>
   );
 }

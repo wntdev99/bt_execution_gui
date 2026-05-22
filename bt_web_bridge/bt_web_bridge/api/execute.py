@@ -78,11 +78,22 @@ async def execute_tree(req: ExecuteRequest, request: Request) -> dict:
     except ConflictError as e:
         raise_http('CONFLICT', str(e), HTTP_CONFLICT, details=e.details)
 
+    # History row — 실행 이력 표/상세에 보이게 함. (이전: scenario 만 기록되어
+    # /history 가 single 실행 누락. C-7 history 보존 정책 적용 대상.)
+    history_id = await state.history_db.start_execution(
+        kind='single',
+        tree_id=run.tree_id,
+        scenario_id=None,
+        payload=req.payload,
+        started_at=run.started_at,
+    )
+    run.history_id = history_id
+
     # Schedule background run task.
     state.background_tasks.add(
         asyncio.create_task(run_single_execution(
             run, state.bridge, state.lock_manager, state.ws_manager,
-            validated.payload_json,
+            validated.payload_json, state.history_db,
         ))
     )
 

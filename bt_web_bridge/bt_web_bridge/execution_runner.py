@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
+from bt_web_bridge.history_db import HistoryDb
 from bt_web_bridge.lock_manager import ActiveRun, LockManager
 from bt_web_bridge.ros_bridge import RosBridge
 from bt_web_bridge.ws_manager import WsManager
@@ -43,8 +44,14 @@ async def run_single_execution(
     lock_manager: LockManager,
     ws_manager: WsManager,
     payload_json: str,
+    history_db: HistoryDb | None = None,
 ) -> None:
-    """Background task for /api/execute. Owns the lock release on exit."""
+    """Background task for /api/execute. Owns the lock release on exit.
+
+    history_db 가 주어지면 finish_execution 으로 단일 실행 결과 기록 (kind='single').
+    start_execution 은 caller (api/execute.py) 가 lock 획득 직후 호출하여
+    run.history_id 를 set 한 상태.
+    """
     final_status_name = 'CRASHED'
     result_message = ''
     try:
@@ -93,11 +100,22 @@ async def run_single_execution(
             'execution_id': run.execution_id,
         })
     finally:
+        finished_at = datetime.now().astimezone()
         await ws_manager.broadcast('execution_finished', {
             'execution_id': run.execution_id,
             'final_status': final_status_name,
             'result_message': result_message,
-            'finished_at': datetime.now().astimezone().isoformat(),
+            'finished_at': finished_at.isoformat(),
         })
+        # History 기록 (Bug #4 fix — single 실행도 /history 에 등장)
+        if history_db is not None and run.history_id is not None:
+            try:
+                await history_db.finish_execution(
+                    run.history_id, final_status_name, result_message,
+                    snapshot={'feedback_messages': list(run.feedback_messages)},
+                    finished_at=finished_at,
+                )
+            except Exception:
+                logger.exception('failed to write single-execution history')
         ws_manager.update_snapshot(active_execution=None)
         lock_manager.release(run.execution_id)
