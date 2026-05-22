@@ -174,6 +174,23 @@ pip install --break-system-packages \
 
 > **TODO (v0.2):** `bt_web_bridge/` 에 `requirements.txt` 박제 후 본 가이드에서 `pip install -r requirements.txt` 한 줄로 단순화. 현재는 파일 부재 — `setup.py:install_requires` 가 SSOT.
 
+**옵션 C - 모듈 검색 경로 수정**
+deactivate 2>/dev/null   # venv 활성화되어 있으면 해제 (rclpy ABI 충돌 회피)
+```bash
+VENV_SITE=/workspaces/vscode_ros2_workspace/src/bt_execution_gui/venv/lib/python3.12/site-packages
+export PYTHONPATH=$VENV_SITE:$PYTHONPATH
+
+source /opt/ros/jazzy/setup.bash
+source /workspaces/vscode_ros2_workspace/install/setup.bash
+
+ros2 run bt_web_bridge bt_web_bridge --port 8000
+```
+- venv 의 fastapi/uvicorn/pydantic 등이 ros2 run 의 Python interpreter 에 보입니다.
+- venv 자체는 활성화하지 않습니다 — python 실행파일은 system 의 것을 그대로 사용 (rclpy 의 native .so 가 system Python ABI
+    와 link 되어 있어서 venv interpreter 와 섞으면 segfault 위험).
+- venv 가 system 과 동일 Python 버전 (둘 다 3.12) 인 경우만 작동. 다르면 ABI mismatch 로 일부 native 패키지 (pydantic-core
+    등) crash 가능.
+
 ---
 
 ## 5. 워크스페이스 배치
