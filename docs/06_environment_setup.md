@@ -191,6 +191,18 @@ ros2 run bt_web_bridge bt_web_bridge --port 8000
 - venv 가 system 과 동일 Python 버전 (둘 다 3.12) 인 경우만 작동. 다르면 ABI mismatch 로 일부 native 패키지 (pydantic-core
     등) crash 가능.
 
+#### 방법 2 — venv 활성화 + system site-packages 노출
+```bash
+source venv/bin/activate
+# venv 가 system site-packages 안 보면 rclpy 미발견 → 우회 방법 두 가지
+export PYTHONPATH=/opt/ros/jazzy/lib/python3.12/site-packages:$PYTHONPATH
+# 또는 venv 생성 시 `python -m venv --system-site-packages venv` 옵션 사용
+
+source /opt/ros/jazzy/setup.bash
+source /workspaces/vscode_ros2_workspace/install/setup.bash
+ros2 run bt_web_bridge bt_web_bridge --port 8000
+```
+
 ---
 
 ## 5. 워크스페이스 배치
