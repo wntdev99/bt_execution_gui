@@ -53,6 +53,8 @@ class ScenarioUpdate(BaseModel):
 
 class ScenarioRunRequest(BaseModel):
     mode: str = 'auto'   # 'auto' | 'step_by_step'
+    # 반복 실행: >=1 이면 N회 반복, <=0 이면 무한 반복 (cancel 로만 종료).
+    repeat_count: int = 1
 
 
 # ════════════════════════════ Helpers ════════════════════════════
@@ -201,7 +203,7 @@ async def run_scenario(
         return {}
 
     try:
-        await state.scenario_engine.run(sc, body.mode)
+        await state.scenario_engine.run(sc, body.mode, body.repeat_count)
     except PayloadValidationError as e:
         raise_http(
             'VALIDATION_ERROR', '시나리오 step payload 검증 실패',
@@ -216,6 +218,7 @@ async def run_scenario(
         'execution_id': active.execution_id if active else None,
         'scenario_id': scenario_id,
         'mode': body.mode,
+        'repeat_count': body.repeat_count,
         'started_at': active.started_at.isoformat() if active else None,
     })
 

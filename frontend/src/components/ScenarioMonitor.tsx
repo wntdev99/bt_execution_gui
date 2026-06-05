@@ -26,6 +26,8 @@ interface Props {
   scenario: Scenario;
   executionId: string | null;
   mode: 'auto' | 'step_by_step';
+  /** 0 = 무한 반복, >=1 = N회. 표시용 초기값(서버 이벤트로 갱신됨). */
+  repeatCount?: number;
   className?: string;
 }
 
@@ -47,9 +49,13 @@ interface MonitorState {
   finishedAt: string | null;
   resultMessage: string;
   isPaused: boolean;
+  // 반복(repeat) 진행 상황.
+  currentIteration: number;
+  totalIterations: number | null;   // null = 무한
+  successIterations: number;
 }
 
-const initState = (): MonitorState => ({
+const initState = (totalIterations: number | null): MonitorState => ({
   phase: 'pending',
   currentStepIdx: null,
   stepStatuses: {},
@@ -59,23 +65,55 @@ const initState = (): MonitorState => ({
   finishedAt: null,
   resultMessage: '',
   isPaused: false,
+  currentIteration: 0,
+  totalIterations,
+  successIterations: 0,
 });
 
-export function ScenarioMonitor({ scenario, executionId, mode, className }: Props) {
-  const [s, setS] = useState<MonitorState>(initState);
+export function ScenarioMonitor({
+  scenario, executionId, mode, repeatCount = 1, className,
+}: Props) {
+  // repeatCount 0 = 무한(null), 그 외 N회.
+  const initialTotal = repeatCount <= 0 ? null : repeatCount;
+  const [s, setS] = useState<MonitorState>(() => initState(initialTotal));
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
 
   useEffect(() => {
-    setS(initState());
-  }, [executionId]);
+    setS(initState(initialTotal));
+  }, [executionId, initialTotal]);
 
   useWebSocket((ev: WsEvent) => {
     if (!executionId) return;
     const innerExecId = (ev.data as { execution_id?: string } | undefined)?.execution_id;
     if (innerExecId && innerExecId !== executionId) return;
 
-    if (ev.type === 'scenario_step_started') {
+    if (ev.type === 'execution_started') {
+      // scenario 실행 시작 — 서버가 알려준 repeat_count 로 total 확정.
+      const rc = ev.data.repeat_count;
+      if (rc !== undefined) {
+        setS((p) => ({ ...p, totalIterations: rc <= 0 ? null : rc }));
+      }
+    } else if (ev.type === 'scenario_iteration_started') {
+      // 새 사이클 시작 — step 진행 상황을 리셋해 같은 step 을 다시 표시.
+      setS((p) => ({
+        ...p,
+        phase: 'running',
+        currentIteration: ev.data.iteration,
+        totalIterations: ev.data.total,
+        currentStepIdx: null,
+        stepStatuses: {},
+        stepDurations: {},
+      }));
+    } else if (ev.type === 'scenario_iteration_finished') {
+      setS((p) => ({
+        ...p,
+        successIterations:
+          ev.data.status === 'SUCCESS'
+            ? p.successIterations + 1
+            : p.successIterations,
+      }));
+    } else if (ev.type === 'scenario_step_started') {
       setS((p) => ({
         ...p,
         phase: 'running',
@@ -162,6 +200,14 @@ export function ScenarioMonitor({ scenario, executionId, mode, className }: Prop
             <div className="mt-1 font-mono text-caption tabular text-text-mute">
               {completedCount}/{scenario.steps.length} · {duration}
             </div>
+            {(s.totalIterations === null || s.totalIterations > 1) && (
+              <div className="mt-1 font-mono text-caption tabular text-accent">
+                {s.totalIterations === null
+                  ? `∞ 사이클 ${s.currentIteration}`
+                  : `사이클 ${s.currentIteration}/${s.totalIterations}`}
+                {s.successIterations > 0 && ` · 성공 ${s.successIterations}`}
+              </div>
+            )}
           </div>
         </div>
 

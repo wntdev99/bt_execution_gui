@@ -303,8 +303,16 @@ If-Match: "2026-05-21T14:00:00+09:00"  ← modified_at
 
 요청:
 ```json
-{ "mode": "auto" }   // "auto" | "step_by_step"
+{ "mode": "auto", "repeat_count": 1 }   // mode: "auto" | "step_by_step"
 ```
+
+- `repeat_count` (선택, 기본 1): 시나리오 전체 반복 횟수.
+  - `>= 1`: N회 반복.
+  - `<= 0`: **무한 반복** (`cancel` 로만 종료).
+- 한 사이클이 `FAILURE`/`CRASHED`/`CANCELLED` 로 끝나면 **즉시 전체 중단**.
+- 사이클 사이에는 최소 안전 지연(기본 1.0초, `MIN_INTER_CYCLE_DELAY_SEC`)이 적용됨.
+- 반복 실행(`repeat_count != 1`)은 step 단위 history 를 저장하지 않고
+  `snapshot` 에 사이클 요약만 남긴다(최근 N개 ring-buffer + 집계).
 
 응답:
 ```json
@@ -314,6 +322,7 @@ If-Match: "2026-05-21T14:00:00+09:00"  ← modified_at
     "execution_id": "exec_uuid_xxx",
     "scenario_id": "floor_change_to_dock",
     "mode": "auto",
+    "repeat_count": 1,
     "started_at": "..."
   }
 }
@@ -579,6 +588,30 @@ BT feedback message 도착.
 { "type": "scenario_resumed", "data": { "execution_id": "exec_xxx" } }
 ```
 
+#### `scenario_iteration_started` / `scenario_iteration_finished`
+반복 실행의 사이클 경계 이벤트. `repeat_count` 와 무관하게 매 사이클 전송.
+```json
+{
+  "type": "scenario_iteration_started",
+  "data": {
+    "execution_id": "exec_xxx",
+    "iteration": 1,          // 1-based
+    "total": 5               // null = 무한 반복
+  }
+}
+```
+```json
+{
+  "type": "scenario_iteration_finished",
+  "data": {
+    "execution_id": "exec_xxx",
+    "iteration": 1,
+    "status": "SUCCESS" | "FAILURE" | "CANCELLED" | "CRASHED",
+    "result_message": "..."
+  }
+}
+```
+
 #### `scenario_completed`
 ```json
 {
@@ -587,7 +620,17 @@ BT feedback message 도착.
     "execution_id": "exec_xxx",
     "final_status": "SUCCESS" | "FAILURE" | "CANCELLED",
     "result_message": "...",
-    "snapshot": { ... },
+    "snapshot": {
+      "mode": "auto",
+      "repeat_count": 5,
+      "completed_iterations": 5,
+      "success_iterations": 5,
+      "recent_iterations": [
+        { "iteration": 1, "status": "SUCCESS", "result_message": "..." }
+      ],
+      "completed_steps": [ ... ],   // 마지막 사이클의 step 진행 상황
+      "remaining_steps": [ ... ]
+    },
     "finished_at": "..."
   }
 }

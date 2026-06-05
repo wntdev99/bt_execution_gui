@@ -132,6 +132,7 @@ export interface ScenarioRunResponse {
   execution_id: string | null;
   scenario_id: string;
   mode: 'auto' | 'step_by_step';
+  repeat_count: number;
   started_at: string | null;
 }
 
@@ -202,6 +203,8 @@ export interface ExecutionStartedInner {
   tree_id: string | null;
   scenario_id: string | null;
   started_at: string;
+  mode?: 'auto' | 'step_by_step';
+  repeat_count?: number;       // scenario 만; <=0 이면 무한 반복
 }
 
 export interface ExecutionFeedbackInner {
@@ -261,12 +264,34 @@ export interface ScenarioStepFeedbackInner {
   message: string;
 }
 
+export interface ScenarioIterationStartedInner {
+  execution_id: string;
+  iteration: number;          // 1-based
+  total: number | null;       // null = 무한 반복
+}
+
+export interface ScenarioIterationFinishedInner {
+  execution_id: string;
+  iteration: number;
+  status: 'SUCCESS' | 'FAILURE' | 'CANCELLED' | 'CRASHED' | string;
+  result_message: string;
+}
+
 export interface ScenarioCompletedInner {
   execution_id: string;
   final_status: 'SUCCESS' | 'FAILURE' | 'CANCELLED' | 'CRASHED' | string;
   result_message: string;
   finished_at: string;
   snapshot: {
+    mode?: string;
+    repeat_count?: number;
+    completed_iterations?: number;
+    success_iterations?: number;
+    recent_iterations?: Array<{
+      iteration: number;
+      status: string;
+      result_message: string;
+    }>;
     completed_steps: Array<{ step_idx: number; step_id: string; status: string }>;
     remaining_steps: string[];
     cancelled_at_step_idx?: number;
@@ -286,4 +311,6 @@ export type WsEvent =
   | { type: 'scenario_step_started'; ts: string; data: ScenarioStepStartedInner }
   | { type: 'scenario_step_finished'; ts: string; data: ScenarioStepFinishedInner }
   | { type: 'scenario_step_feedback'; ts: string; data: ScenarioStepFeedbackInner }
+  | { type: 'scenario_iteration_started'; ts: string; data: ScenarioIterationStartedInner }
+  | { type: 'scenario_iteration_finished'; ts: string; data: ScenarioIterationFinishedInner }
   | { type: 'scenario_completed'; ts: string; data: ScenarioCompletedInner };

@@ -158,10 +158,11 @@ export const api = {
     run(
       scenarioId: string,
       mode: 'auto' | 'step_by_step' = 'auto',
+      repeatCount = 1,
     ): Promise<ScenarioRunResponse> {
       return request(`/scenarios/${encodeURIComponent(scenarioId)}/run`, {
         method: 'POST',
-        body: JSON.stringify({ mode }),
+        body: JSON.stringify({ mode, repeat_count: repeatCount }),
       });
     },
     /* Run controls — endpoints under /api/scenarios/run/* */

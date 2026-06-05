@@ -22,16 +22,21 @@ export default function ScenarioRunPage({ params }: { params: { id: string } }) 
     [id],
   );
   const [mode, setMode] = useState<'auto' | 'step_by_step'>('auto');
+  const [infinite, setInfinite] = useState(false);
+  const [repeatCount, setRepeatCount] = useState(1);
   const [executionId, setExecutionId] = useState<string | null>(null);
   const [runErr, setRunErr] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // 무한이면 0, 아니면 최소 1 보장.
+  const effectiveRepeat = infinite ? 0 : Math.max(1, Math.floor(repeatCount));
 
   function handleRun() {
     if (!scenario) return;
     setRunErr(null);
     startTransition(async () => {
       try {
-        const res = await api.scenarios.run(scenario.id, mode);
+        const res = await api.scenarios.run(scenario.id, mode, effectiveRepeat);
         setExecutionId(res.execution_id ?? null);
       } catch (e) {
         if (e instanceof ApiError) {
@@ -94,6 +99,40 @@ export default function ScenarioRunPage({ params }: { params: { id: string } }) 
             </ModeChip>
           </div>
 
+          <h3 className="mt-6 text-title">반복 실행</h3>
+          <p className="mt-1 text-caption text-text-sub">
+            시나리오 전체를 여러 번 반복합니다. 한 사이클이 실패하면 즉시 중단됩니다.
+            사이클 사이에는 최소 안전 지연이 적용됩니다.
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-body text-text">
+              <input
+                type="number"
+                min={1}
+                value={repeatCount}
+                disabled={infinite}
+                onChange={(e) => setRepeatCount(Number(e.target.value) || 1)}
+                className="h-10 w-24 rounded-lg border border-border bg-bg px-3 font-mono text-body text-text disabled:opacity-40"
+              />
+              회 반복
+            </label>
+            <label className="flex items-center gap-2 text-body text-text-sub">
+              <input
+                type="checkbox"
+                checked={infinite}
+                onChange={(e) => setInfinite(e.target.checked)}
+                className="h-4 w-4 accent-accent"
+              />
+              무한 반복 (취소할 때까지)
+            </label>
+          </div>
+          {infinite && (
+            <p className="mt-2 text-caption text-warning">
+              ⚠ 무한 반복은 <strong>취소</strong> 버튼으로만 종료됩니다.
+            </p>
+          )}
+
           {runErr && (
             <div className="mt-3 whitespace-pre-line rounded-lg bg-danger-soft p-3 text-caption text-danger">
               {runErr}
@@ -122,6 +161,7 @@ export default function ScenarioRunPage({ params }: { params: { id: string } }) 
         scenario={scenario}
         executionId={executionId}
         mode={mode}
+        repeatCount={effectiveRepeat}
       />
     </div>
   );

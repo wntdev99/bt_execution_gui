@@ -52,6 +52,9 @@ class ActiveRun:
     is_paused: bool = False
     resume_event: asyncio.Event = field(default_factory=asyncio.Event)
     history_id: int | None = None    # sqlite execution_history.id
+    # Scenario repeat (>=1: N회 반복, <=0: 무한 반복 — cancel 로만 종료).
+    repeat_count: int = 1
+    current_iteration: int = 0   # 1-based; 0 = 아직 시작 전
 
     def to_status_dict(self) -> dict:
         """Compact snapshot for /api/status + ws welcome."""
@@ -62,6 +65,8 @@ class ActiveRun:
             'scenario_id': self.scenario_id,
             'current_step_idx': self.current_step_idx,
             'started_at': self.started_at.isoformat(),
+            'repeat_count': self.repeat_count,
+            'current_iteration': self.current_iteration,
         }
 
 
