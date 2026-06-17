@@ -38,6 +38,8 @@ bt_schema_server:
       - w_publish_string_bt_node
       - w_cancel_requested_bt_node
       - w_update_param_node_bt_node
+      - w_update_param_service_node_bt_node
+      - w_is_footprint_swapped_bt_node
       - w_call_set_bool_service_bt_node
       - w_area_subscribe_action_bt_node
       - w_check_area_condition_bt_node
