@@ -1,0 +1,24 @@
+# bt_execution_gui Layer 1 — ScreenInteractionTree sidecar manifest
+# 대응 트리: dev-behavior-tree/w_behavior_tree/w_behavior_tree/behavior_trees/ScreenInteractionTree.xml
+#
+# 스크린(SM)과 상호작용하는 시나리오 최상위 디스패처. payload 의 scenario 문자열로
+# 미션 서브트리를 선택(Switch)한다. 명령 소스(화면 트리거 FMS / 미래 클라우드)를
+# 모르고 scenario 문자열만 본다.
+tree_id: ScreenInteractionTree
+display_name: "스크린 상호작용"
+description: |
+  scenario 값으로 미션 서브트리를 선택해 스크린(SM)과 상호작용한다.
+  - get_parcel: loading 화면 대기 → 문 열기(+열림 확인, 실패 시 재시도) →
+    countdown 화면 전환(loaded) → 전환 확인.
+  실행 시 필요 서버: /change_screen·/screen/status (SM),
+  /dummy/robot/open_side_door·/dummy/robot/side_door/status (dummy_node).
+  미정 scenario 는 즉시 실패(AlwaysFailure).
+category: single
+dangerous: false
+estimated_duration_sec: 60
+params:
+  - key: scenario
+    type: string
+    required: true
+    enum: ["get_parcel"]
+    description: "미션 식별자. 현재 get_parcel(물건 받기)만 구현. give_parcel 등은 후속."

@@ -28,6 +28,7 @@ bt_schema_server:
       - PassDoorScenarioTree
       - ElevatorBoardingTree
       - ElevatorAlightingTree
+      - ScreenInteractionTree
 
     plugin_lib_names:
       # 본 list 는 bt_execution_server.yaml 과 동일하게 유지. CI 의 self-check 가
@@ -55,6 +56,11 @@ bt_schema_server:
       - w_undock_robot_action_bt_node
       - w_update_param_service_node_bt_node
       - w_is_footprint_swapped_bt_node
+      # ── 스크린 상호작용 (ScreenInteractionTree / get_parcel) ──
+      - w_open_side_door_bt_node
+      - w_change_screen_bt_node
+      - w_wait_screen_state_bt_node
+      - w_check_door_open_bt_node
 
       # ── Nav2 BT 플러그인 ──
       - nav2_compute_path_to_pose_action_bt_node
